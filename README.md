@@ -4,4 +4,4 @@ The replacement board for the famous AY-3-8910/AY-3-8912/YM2149F sound chip of t
 
 ![Photo](./hardware/Photo_Top_Side.jpg)
 
-**EasyEDA** project **[HERE](https://easyeda.com/yevgeniy.olexandrenko/scott-calculator)**.
+**EasyEDA** project **[HERE](https://easyeda.com/yevgeniy.olexandrenko/avr-ay)**.
