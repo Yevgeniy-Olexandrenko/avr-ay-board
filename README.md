@@ -96,7 +96,7 @@ void loop() {
 
 # Hardware
 
-The **[schematic](/hardware/AY-3-8912-Emulator-v1.1_Schematic.pdf)** of the device is quite simple. The heart of the emulator is an 8-bit ATmega series microcontroller, which runs at an overclocked frequency and performs low-level simulation of the sound chip. The rest of the device is three low-pass filters with a cutoff frequency of about 20 kHz and three communication interfaces. An analog signals of three audio channels are generated at the output of the emulator.
+The [schematic](/hardware/AY-3-8912-Emulator-v1.1_Schematic.pdf) of the device is quite simple. The heart of the emulator is an 8-bit ATmega series microcontroller, which runs at an overclocked frequency and performs low-level simulation of the sound chip. The rest of the device is three low-pass filters with a cutoff frequency of about 20 kHz and three communication interfaces. An analog signals of three audio channels are generated at the output of the emulator.
 
 ### Parallel interface
 
@@ -141,6 +141,9 @@ TODO
 
 # References, Links and Notes
 
-TODO
-
-**EasyEDA** project **[HERE](https://easyeda.com/yevgeniy.olexandrenko/avr-ay)**.
+1. [Project on EasyEDA](https://easyeda.com/yevgeniy.olexandrenko/avr-ay)
+2. [AVR-AY Home Page](https://www.avray.ru)
+3. [Discussion on ZX-PK.ru](https://zx-pk.ru/threads/10510-emulyator-ay-8910-na-atmega.html)
+4. [AY-3-8910/12 Datasheet](/datasheet/AY-3-8910-microchip.pdf)
+5. [YM2149 Datasheet](/datasheet/ym2149-yamaha.pdf)
+6. [ATmega88 Datasheet](/datasheet/ATmega88.pdf)
