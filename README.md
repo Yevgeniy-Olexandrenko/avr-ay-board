@@ -4,4 +4,25 @@ The replacement board for the famous AY-3-8910/AY-3-8912/YM2149F sound chip of t
 
 ![Photo](/hardware/AY-3-8912-Emulator-v1.1_Photo.jpg)
 
+### Features:
+- Complete chip emulation
+- Parallel mode support (Read mode also supported)
+- Serial mode support using `RX` pin at speed 57600
+- Speaker input support using `SPK` pin
+
+### Serial protocol communication:
+Baud Rate|Data Bits|Stop Bits|Parity
+-|-|-|-
+57600|8|1|NONE
+
+Registers sent as a pair of values:
+- Register number `0-13`
+- Register value
+
+To synchronize, just send `0xFF` at start of sending.
+
+# Firmware
+
+TODO
+
 **EasyEDA** project **[HERE](https://easyeda.com/yevgeniy.olexandrenko/avr-ay)**.
