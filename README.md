@@ -1,6 +1,6 @@
-# AY-3-8912 Emulator (AVR-AY)
+# Introduction
 
-The replacement board for the famous AY-3-8910/AY-3-8912/YM2149F sound chip of the ZX-Spectrum 128 and others. Based on the schematic and firmware from https://www.avray.ru, https://zx-pk.ru/threads/10510-emulyator-ay-8910-na-atmega.html and https://github.com/andykarpov/turbosound28p resources.
+**AY-3-8912 Emulator (AVR-AY)** is a replacement board for the famous AY-3-8910/AY-3-8912/YM2149F sound chip of the ZX-Spectrum 128 and others. Based on the schematic and firmware from [AVR-AY project](https://www.avray.ru), [discussion on ZX-PK.ru](https://zx-pk.ru/threads/10510-emulyator-ay-8910-na-atmega.html) and [Turbo Sound schematic](https://github.com/andykarpov/turbosound28p) resources.
 
 ![Photo](/hardware/AY-3-8912-Emulator-v1.1_Photo.jpg)
 
@@ -20,7 +20,7 @@ Baud Rate|Data Bits|Stop Bits|Parity
 
 Registers are sent as a pair of values: register number (0-13), then register value. To synchronize, just send `0xFF` at the start of sending.
 
-This sound chip emulator can be used in conjunction with the [AVR-AY Player](https://www.avray.ru/avr-ay-player). You will need the most ordinary USB to serial TTL converter. Just connect +5V, GND and TX pins of the converter to VCC, GND and RX pins of this emulation device, choose COM port and `Open` it in the player and start playing music.
+This sound chip emulator can be used in conjunction with the [AVR-AY Player](https://www.avray.ru/avr-ay-player). You will need the most ordinary USB to serial TTL converter. Just connect +5V, GND and TX pins of the converter to VCC, GND and RX pins of this emulation device, choose COM port, `Open` it in the player and start playing music.
 
 ### Parallel communication mode
 
@@ -96,7 +96,16 @@ void loop() {
 
 # Hardware
 
-The [schematic](/hardware/AY-3-8912-Emulator-v1.1_Schematic.pdf) of the device is quite simple. The heart of the emulator is an 8-bit ATmega series microcontroller, which runs at an overclocked frequency and performs low-level simulation of the sound chip. The rest of the device is three low-pass filters with a cutoff frequency of about 20 kHz and three communication interfaces. An analog signals of three audio channels are generated at the output of the emulator.
+The [schematic](/hardware/AY-3-8912-Emulator-v1.1_Schematic.pdf) of the device is quite simple. The heart of the emulator is a 8-bit ATmega series microcontroller, which runs at an overclocked frequency and performs low-level simulation of the sound chip. The rest of the device is three low-pass filters with a cutoff frequency of about 20 kHz and three communication interfaces. An analog signals of three audio channels are generated at the output of the emulator.
+
+### Serial interface
+
+Pin|Name|Function
+-|-|-
+1|`GND`|Ground
+2|`VCC`|Power Supply (+5V)
+3|`SPK`|Speaker Input
+4|`RX`| Serial Data Input
 
 ### Parallel interface
 
@@ -117,15 +126,6 @@ Pin|Name|Function|Pin|Name|Function
 13|`NC`|*no connect*|16|`RES`|Reset (Low active)
 14|`NC`|*no connect*|15|`NC`|*no connect*
 
-### Serial interface
-
-Pin|Name|Function
--|-|-
-1|`GND`|Ground
-2|`VCC`|Power Supply (+5V)
-3|`SPK`|Speaker Input
-4|`RX`| Serial Data Input
-
 ### In-Circuit Serial Programming interface
 
 Pin|Name|Function|Pin|Name|Function
@@ -134,6 +134,9 @@ Pin|Name|Function|Pin|Name|Function
 3|`SCK`|Clock|4|`MOSI`|Master Out/Slave In
 5|`RES`|Reset|6|`GND`|Ground
 
+### Hardware configuration
+
+The default hardware configuration of the device assumes the use of an ATmega88PA microcontroller with a 27 MHz crystal resonator. According to reviews, it should work reliably. But you are free to use another microcontroller (ATmega8, ATmega48, ATmega168 and ATmega328) and a quartz resonator with another frequency (20 MHz, 24 MHz, 25 MHz, 28.332 MHz, 28 MHz, 30 MHz, 32 MHz and 40 MHz). It should be clear that firmware with full functionality (standard) may be unstable at a lower operation frequency. In this case, you need to use the firmware configuration for the specific communication interface.
 
 # Firmware
 
