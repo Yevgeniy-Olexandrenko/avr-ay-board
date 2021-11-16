@@ -20,11 +20,11 @@ Baud Rate|Data Bits|Stop Bits|Parity
 
 Registers are sent as a pair of values: register number (0-13), then register value. To synchronize, just send `0xFF` at the start of sending.
 
-TODO
+This sound chip emulator can be used in conjunction with the [AVR-AY Player](https://www.avray.ru/avr-ay-player). You will need the most ordinary USB to serial TTL converter. Just connect +5V, GND and TX pins of the converter to VCC, GND and RX pins of this emulation device, choose COM port and `Open` it in the player and start playing music.
 
 ### Parallel communication mode
 
-The following sketch is for parallel data streaming to AY-3-8910 / AY-3-8912 / YM2149F or to an emulator. Data is received by the Arduino via the corresponding COM port and sent to the chip in parallel.
+Following Arduino sketch is for parallel data streaming to a sound chip emulator. Data is received by the Arduino via the corresponding COM port and sent to the chip in parallel. For quick and easy testing, you can use the **AVR-AY Player** as described in the previous section. Just select the COM port of the Arduino board.
 
 ```c
  // connect to D0,1,...,7
