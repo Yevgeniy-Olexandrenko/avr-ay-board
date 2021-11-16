@@ -10,16 +10,89 @@ The replacement board for the famous AY-3-8910/AY-3-8912/YM2149F sound chip of t
 - Serial mode support using `RX` pin at speed 57600
 - Speaker input support using `SPK` pin
 
-### Serial protocol communication:
+# Usage
+
+### Serial communication mode
+
 Baud Rate|Data Bits|Stop Bits|Parity
 -|-|-|-
 57600|8|1|NONE
 
-Registers sent as a pair of values:
-- Register number (0-13)
-- Register value
+Registers are sent as a pair of values: register number (0-13), then register value. To synchronize, just send `0xFF` at the start of sending.
 
-To synchronize, just send `0xFF` at the start of sending.
+TODO
+
+### Parallel communication mode
+
+The following sketch is for parallel data streaming to AY-3-8910 / AY-3-8912 / YM2149F or to an emulator. Data is received by the Arduino via the corresponding COM port and sent to the chip in parallel.
+
+```c
+ // connect to D0,1,...,7
+const int ad[8] = { 8, 9, 2, 3, 4, 5, 6, 7 };
+
+const int pinBC1  = 10;
+const int pinBDIR = 11;
+
+// fast pin switching macros
+#define CLR(x,y) (x&=(~(1<<y)))
+#define SET(x,y) (x|=(1<<y))
+#define __BCPORT__ PORTB
+#define __BC1__    2
+#define __BDIR__   3
+
+void send_data(byte address, byte data) {
+  // write address to pins
+  PORTB |= address & 0x03;
+  PORTD |= address & 0xFC;
+  
+  // validate addess
+  __BCPORT__ |= (1 << __BDIR__) + (1 << __BC1__);
+  delayMicroseconds(1);
+  __BCPORT__ &= ~((1 << __BDIR__) + (1 << __BC1__));
+  PORTB &= ~(address & 0x03);
+  PORTD &= ~(address & 0xFC);
+
+  // write data to pins
+  PORTB |= data & 0x03;
+  PORTD |= data & 0xFC;
+  
+  // validate data
+  SET(__BCPORT__,__BDIR__);
+  delayMicroseconds(1);
+  CLR(__BCPORT__,__BDIR__);
+  PORTB &= ~(data & 0x03);
+  PORTD &= ~(data & 0xFC);
+}
+
+void setup() {
+  // init pins
+  for (int i=0; i < 8; i++) {
+    pinMode(ad[i], OUTPUT);
+  }
+  pinMode(pinBC1, OUTPUT);
+  pinMode(pinBDIR, OUTPUT);
+
+  // inactive mode
+  digitalWrite(pinBC1, LOW);
+  digitalWrite(pinBDIR, LOW);
+
+  // serial init
+  Serial.begin(57600);
+}
+
+void loop() {
+  byte reg;
+  while (true) {
+    do {
+      while (Serial.available() < 1) delayMicroseconds(1);
+      reg = Serial.read();
+    } while (reg > 15);
+
+    while (Serial.available() < 1) delayMicroseconds(1);
+    send_data(reg, Serial.read());
+  }
+}
+```
 
 # Hardware
 
