@@ -257,228 +257,232 @@ NO_ENVELOPE_CHANGED_S:
 ; ==============================================================================
 _RESET:
 #if MCU_TYPE == 0
-    in		r16,SFIOR			; 1-> PUD for Atmega8
-    sbr		r16,PUD
-    out		SFIOR,r16
+    in      r16, SFIOR              ; 1-> PUD for Atmega8
+    sbr     r16, PUD
+    out     SFIOR, r16
 #else
-    in		r16,MCUCR			; 1-> PUD for Atmega48/88/168/328
-    sbr		r16,PUD
-    out		MCUCR,r16
+    in      r16, MCUCR              ; 1-> PUD for Atmega48/88/168/328
+    sbr     r16, PUD
+    out     MCUCR, r16
 #endif
 
     ; init stack pointer at end of RAM
-    ldi		r16,low(RAMEND)
-    out		SPL,r16
-    ldi		r16,high(RAMEND)
-    out		SPH,r16
+    ldi     r16, low(RAMEND)
+    out     SPL, r16
+    ldi     r16, high(RAMEND)
+    out     SPH, r16
 
     ; disable Analog Comparator
 #if MCU_TYPE == 0
-    sbi		ACSR,ACD			; for atmega8
+    sbi     ACSR, ACD               ; for atmega8
 #else
-    in		r16,ACSR			; for ATMEGA48/88/168/328
-    sbr		r16,ACD
-    out		ACSR,r16
+    in      r16, ACSR               ; for ATMEGA48/88/168/328
+    sbr     r16, ACD
+    out     ACSR, r16
 #endif
 
     ; init constants
-    clr		C00
-    ldi		r16,0xC0
-    mov		CC0,r16
-    ldi		r16,0x04
-    mov		C04,r16
-    ldi		r16,0x1F
-    mov		C1F,r16
-    ldi		r16,0xFF
-    mov		BusOut1,r16
-    mov		BusOut2,CC0
-    clr		RNGH
+    clr     C00
+    ldi     r16, 0xC0
+    mov     CC0, r16
+    ldi     r16, 0x04
+    mov     C04, r16
+    ldi     r16, 0x1F
+    mov     C1F, r16
+    ldi     r16, 0xFF
+    mov     BusOut1, r16
+    mov     BusOut2, CC0
+    clr     RNGH
 
     ; clear register values in SRAM 0x110-0x13F
-    ldi		r18,0x10
-    ldi		ZL,0x10
-    ldi		ZH,0x01
+    ldi     r18, 0x10
+    ldi     ZL, 0x10
+    ldi     ZH, 0x01
 
 LOOP0:
-    std		Z+0x20,CC0
-    std		Z+0x10,r16
-    st		Z+,C00
-    dec		r18
-    brne	LOOP0
+    std     Z+0x20, CC0
+    std     Z+0x10, r16
+    st      Z+, C00
+    dec     r18
+    brne    LOOP0
 
     ; load envelope codes to SRAM 0x210, 16 bytes
-    ldi		xh,0x02
-    ldi		xl,0x10
-    ldi 	zl, low(2*Envelopes)
-    ldi 	zh, high(2*Envelopes)
-    ldi		r18,0x10
-    rcall	_COPY
+    ldi     xh, 0x02
+    ldi     xl, 0x10
+    ldi     zl, low(2*Envelopes)
+    ldi     zh, high(2*Envelopes)
+    ldi     r18, 0x10
+    rcall   _COPY
 
     ; load volume table for amplitude to SRAM 0x220, 16 bytes
-    ldi		xl,0x20
-    ldi 	zl, low(2*Volumes)
-    ldi 	zh, high(2*Volumes)
-    ldi		r18,0x10
-    rcall	_COPY
+    ldi     xl, 0x20
+    ldi     zl, low(2*Volumes)
+    ldi     zh, high(2*Volumes)
+    ldi     r18, 0x10
+    rcall   _COPY
 
     ; load volume table for envelopes to SRAM 0x230, 32 bytes
-    ldi		xl,0x30
-    ldi 	zl, low(2*EVolumes)
-    ldi 	zh, high(2*EVolumes)
-    ldi		r18,0x20
-    rcall	_COPY
+    ldi     xl, 0x30
+    ldi     zl, low(2*EVolumes)
+    ldi     zh, high(2*EVolumes)
+    ldi     r18, 0x20
+    rcall   _COPY
 
     ; load register masks to SRAM 0x100, 16 bytes
-    clr		xl
-    ldi		xh,0x01
-    ldi 	zl, low(2*RegsMask)
-    ldi 	zh, high(2*RegsMask)
-    ldi		r18,0x10
-    rcall	_COPY
+    clr     xl
+    ldi     xh, 0x01
+    ldi     zl, low(2*RegsMask)
+    ldi     zh, high(2*RegsMask)
+    ldi     r18, 0x10
+    rcall   _COPY
 
 
-    ldi		ZH,0x01		; set high byte of register Z for fast acces to register values
-    ldi		YH,0x02		; set high byte of register Y for fast acces to volume table
-    mov		NoiseAddon,ZH	; load default value = 1 to high bit of noise generator
+    ldi     ZH, 0x01                ; set high byte of register Z for fast acces to register values
+    ldi     YH, 0x02                ; set high byte of register Y for fast acces to volume table
+    mov     NoiseAddon, ZH          ; load default value = 1 to high bit of noise generator
 
     ; get byte 0 from EEPROM, check value > 0 or skip USART initialization if value = 0
 #if MCU_TYPE == 0 ||  MCU_TYPE > 1
-    out		EEARH,C00		; is absent in Atmega48
+    out     EEARH, C00              ; is absent in Atmega48
 #endif
-    out		EEARL,C00
-    sbi		EECR,b0
-    in		r16,EEDR
-    cp		r16,C00
-    breq	NO_USART
+    out     EEARL, C00
+    sbi     EECR, b0
+    in      r16, EEDR
+    cp      r16, C00
+    breq    NO_USART
 
-    ; init USART
-    clr		r16
+    ; --------------------------------------------------------------------------
+    ; Init USART
+    ; --------------------------------------------------------------------------
+    clr     r16
 #if MCU_TYPE == 0
-    out		UBRRH,r16
-    ldi		r16,0x86
-    out		UCSRC,r16
-    ldi		r16,0x02
-    out		UCSRA,r16
-    ldi		r16,0x90
-    out		UCSRB,r16
+    out     UBRRH, r16
+    ldi     r16, 0x86
+    out     UCSRC, r16
+    ldi     r16, 0x02
+    out     UCSRA, r16
+    ldi     r16, 0x90
+    out     UCSRB, r16
 #else
-    sts		UBRR0H,r16
-    ldi		r16,0x06
-    sts		UCSR0C,r16
-    ldi		r16,0x02
-    sts		UCSR0A,r16
-    ldi		r16,0x90
-    sts		UCSR0B,r16
+    sts     UBRR0H, r16
+    ldi     r16, 0x06
+    sts     UCSR0C, r16
+    ldi     r16, 0x02
+    sts     UCSR0A, r16
+    ldi     r16, 0x90
+    sts     UCSR0B, r16
 #endif
-    ldi		r16,0x03
-    out		EEARL,r16
-    sbi		EECR,b0
-    in		r18,EEDR
+    ldi     r16, 0x03
+    out     EEARL, r16
+    sbi     EECR, b0
+    in      r18, EEDR
 #if MCU_TYPE == 0
-    out		UBRRL,r18
+    out     UBRRL, r18
 #else
-    sts		UBRR0L,r18
+    sts     UBRR0L, r18
 #endif
 NO_USART:
 
-    ; init Timer1
+    ; --------------------------------------------------------------------------
+    ; Init Timer1
+    ; --------------------------------------------------------------------------
 #if MCU_TYPE == 0
-    out		OCR1AH,C00		; clear OCR values
-    out		OCR1AL,C00
-    out		OCR1BH,C00
-    out		OCR1BL,C00
+    out     OCR1AH, C00             ; clear OCR values
+    out     OCR1AL, C00
+    out     OCR1BH, C00
+    out     OCR1BL, C00
 #else
-    sts		OCR1AH,C00		; clear OCR values
-    sts		OCR1AL,C00
-    sts		OCR1BH,C00
-    sts		OCR1BL,C00
+    sts     OCR1AH, C00             ; clear OCR values
+    sts     OCR1AL, C00
+    sts     OCR1BH, C00
+    sts     OCR1BL, C00
 #endif
-    sbi		DDRB,b1			; set port B pin 1 to output for PWM (AY channel A)
-    sbi		DDRB,b2			; set port B pin 2 to output for PWM (AY channel B)
-    ldi		r16,0xA2
+    sbi     DDRB, b1                ; set port B pin 1 to output for PWM (AY channel A)
+    sbi     DDRB, b2                ; set port B pin 2 to output for PWM (AY channel B)
+    ldi     r16, 0xA2
 #if MCU_TYPE == 0
-    out		TCCR1A,r16
+    out     TCCR1A, r16
 #else
-    sts		TCCR1A,r16
-    ldi		r16,0x19
-    sts		TCCR1B,r16
+    sts     TCCR1A, r16
+    ldi     r16, 0x19
+    sts     TCCR1B, r16
 #endif
-    ldi		r16,0x19
+    ldi     r16, 0x19
 #if MCU_TYPE == 0
-    out		TCCR1B,r16
+    out     TCCR1B, r16
 #else
-    sts		TCCR1B,r16
+    sts     TCCR1B, r16
 #endif
-    out		EEARL,YH		; set EEPROM address 2
-    sbi		EECR,b0
-    in		r18,EEDR		; load byte 2 from EEPROM to r18
+    out     EEARL, YH               ; set EEPROM address 2
+    sbi     EECR, b0
+    in      r18, EEDR               ; load byte 2 from EEPROM to r18
 #if MCU_TYPE == 0
-    out		ICR1H,C00
-    out		ICR1L,r18		; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
+    out     ICR1H, C00
+    out     ICR1L, r18              ; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
 #else
-    sts		ICR1H,C00
-    sts		ICR1L,r18		; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
+    sts     ICR1H, C00
+    sts     ICR1L, r18              ; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
 #endif
     ; ICR1L value formula (28000000/109375/2 - 1) where 28000000 = 28MHz - AVR oscillator frequency
     ; 109375 is for 1.75 MHz version, formula is (PSG frequency / 16) e.g. for 2MHz it is 2000000/16 = 125000
 
+    ; --------------------------------------------------------------------------
+    ; Init Timer2
+    ; --------------------------------------------------------------------------
 #if CHANNELS == 3
-    ; init Timer2
-    sbi		DDRB,DDB3		; set port B pin 3 to output for PWM (AY channel C)
+    sbi     DDRB, DDB3              ; set port B pin 3 to output for PWM (AY channel C)
 #if MCU_TYPE == 0
-    ldi	r16,0x69
-    out	TCCR2,r16
+    ldi     r16, 0x69
+    out     TCCR2, r16
 #else
-    ldi	r16,0x83
-    sts	TCCR2A,r16
-    ldi	r16,0x01
-    sts	TCCR2B,r16
+    ldi     r16, 0x83
+    sts     TCCR2A, r16
+    ldi     r16, 0x01
+    sts     TCCR2B, r16
 #endif
 #endif
 
     ;check for external interrupts enabled in byte 1 of EEPROM
-    out		EEARL,ZH
-    sbi		EECR,b0
-    in		r16,EEDR
-    cp		r16,C00
-    breq	NO_EXT_INT
+    out     EEARL, ZH
+    sbi     EECR, b0
+    in      r16, EEDR
+    cp      r16, C00
+    breq    NO_EXT_INT
 
+    ; --------------------------------------------------------------------------
+    ; Init external interrupts INT0 and INT1
+    ; --------------------------------------------------------------------------
 #if MCU_TYPE == 0
-    ; set INT0,INT1 ATMEGA8 ====================================
-    // external interrupts initialization
-    ldi		r16,0x0F		; fallen edge of INT0, INT1
-    out		MCUCR,r16
-    out		GIFR,CC0		; clear interrupt flags
-    out		GICR,CC0		; enable interrupts
-    ; ==========================================================
+    ldi     r16, 0x0F               ; fallen edge of INT0, INT1
+    out     MCUCR, r16
+    out     GIFR, CC0               ; clear interrupt flags
+    out     GICR, CC0               ; enable interrupts
 #else
-    ; set INT0,INT1 ATMEGA48/88/168/328 ========================
-    ldi		r16,0x0F		; fallen edge of INT0, INT1
-    sts		EICRA,r16
-    ldi		r16,0x03
-    out		EIFR,r16
-    out		EIMSK,r16
-    ; ==========================================================
+    ldi     r16, 0x0F               ; fallen edge of INT0, INT1
+    sts     EICRA, r16
+    ldi     r16, 0x03
+    out     EIFR, r16
+    out     EIMSK, r16
 #endif
 NO_EXT_INT:
 
     ; init constants and variables second part
-    ldi		ADDR,0x10
-    clr		TNLevel
-    clr		OutA
-    clr		OutB
-    clr		OutC
-    mov		TabP,CC0		; set envelope generator disablet by default
-    clr		TabE
-    clr		BusData
-    clr		CntN
-    clr		CntAL
-    clr		CntAH
-    movw	CntBL,CntAL
-    movw	CntCL,CntAL
-    movw	CntEL,CntAL
-    clr		EVal
-    sei						; enable global interrupts
+    ldi     ADDR, 0x10
+    clr     TNLevel
+    clr     OutA
+    clr     OutB
+    clr     OutC
+    mov     TabP, CC0               ; set envelope generator disablet by default
+    clr     TabE
+    clr     BusData
+    clr     CntN
+    clr     CntAL
+    clr     CntAH
+    movw    CntBL, CntAL
+    movw    CntCL, CntAL
+    movw    CntEL, CntAL
+    clr     EVal
+    sei                             ; enable global interrupts
 
 ; ==============================================================================
 ; Main Loop
@@ -689,7 +693,7 @@ CH_C_NO_CHANGE:
 ; Subroutines
 ; ==============================================================================
 _COPY:                      ; copy from flash to SRAM
-    lpm	    r16, Z+
+    lpm     r16, Z+
     st      X+, r16
     dec     r18
     brne    _COPY
