@@ -8,448 +8,482 @@
 ;
 ; ORIGIN: http://www.avray.ru
 
-; CONFIGURATION VALUES ===================================================
-#define CHANNELS 2 		; choose 2 or 3 channel version
-#define SPEAKER 0		; use SPEAKER port input on PD1 (0 - no, 1 - yes)
-#define VOLUME_TABLE 0	; 0 - AY, 1 - YM, 2 - ALTERNATE volume table
-#define MCU_TYPE 2		; 0 - Atmega8, 1 - Atmega48, 2 - Atmega88/168/328
-; ========================================================================
-; bit numbers:
-.equ	b0	= 0x00
-.equ	b1	= 0x01
-.equ	b2	= 0x02
-.equ	b3	= 0x03
-.equ	b4	= 0x04
-.equ	b5	= 0x05
-.equ	b6	= 0x06
-.equ	b7	= 0x07
+; ==============================================================================
+; Configuration
+; ==============================================================================
+#define CHANNELS     2 ; choose 2 or 3 channel version
+#define SPEAKER      0 ; use SPEAKER port input on PD1 (0 - no, 1 - yes)
+#define VOLUME_TABLE 0 ; 0 - AY, 1 - YM, 2 - ALTERNATE volume table
+#define MCU_TYPE     2 ; 0 - Atmega8, 1 - Atmega48, 2 - Atmega88/168/328
 
+; ==============================================================================
+; Declarations & definitions
+; ==============================================================================
 
-; register variables:
-.def	OutA		= r0
-.def	OutC		= r1
-.def	C1F			= r2
-.def	CntN		= r3
-.def	OutB		= r4
-.def	BusOut1		= r5
-.def	NoiseAddon	= r6
-.def	C00			= r7
-.def	CC0			= r8
-.def	BusOut2		= r9
-.def	C04			= r10
-.def	TMP			= r11
-.def	BusData		= r12
-.def	SREGSave	= r13
-.def	RNGL		= r14
-.def	RNGH		= r15
-.def	TabE		= r16
-.def	EVal		= r17
-.def	TabP		= r18
-.def	TNLevel		= r19
-.def	CntAL		= r20
-.def	CntAH		= r21
-.def	CntBL		= r22
-.def	CntBH		= r23
-.def	CntCL		= r24
-.def	CntCH		= r25
-.def	CntEL		= r26
-.def	CntEH		= r27
-.def	ADDR		= r30
+    ; bit numbers:
+    .equ b0 = 0x00
+    .equ b1 = 0x01
+    .equ b2 = 0x02
+    .equ b3 = 0x03
+    .equ b4 = 0x04
+    .equ b5 = 0x05
+    .equ b6 = 0x06
+    .equ b7 = 0x07
 
+    ; register variables:
+    .def OutA       = r0
+    .def OutC       = r1
+    .def C1F        = r2
+    .def CntN       = r3
+    .def OutB       = r4
+    .def BusOut1    = r5
+    .def NoiseAddon = r6
+    .def C00        = r7
+    .def CC0        = r8
+    .def BusOut2    = r9
+    .def C04        = r10
+    .def TMP        = r11
+    .def BusData    = r12
+    .def SREGSave   = r13
+    .def RNGL       = r14
+    .def RNGH       = r15
+    .def TabE       = r16
+    .def EVal       = r17
+    .def TabP       = r18
+    .def TNLevel    = r19
+    .def CntAL      = r20
+    .def CntAH      = r21
+    .def CntBL      = r22
+    .def CntBH      = r23
+    .def CntCL      = r24
+    .def CntCH      = r25
+    .def CntEL      = r26
+    .def CntEH      = r27
+    .def ADDR       = r30
 
-	.cseg
-;------------------------------------------------------
-; INTERRUPT VECTORS TABLE
-;------------------------------------------------------
-	.org	0x0000
-	rjmp	_RESET
+    ; code section starts here
+    .cseg
 
-	.org	INT0addr
-	rjmp	_INT0_Handler
+; ==============================================================================
+; Interrupt Vectors Table
+; ==============================================================================
+    .org    0x0000
+    rjmp    _RESET
 
-	.org	INT1addr
- 	rjmp	_INT1_Handler
+    .org    INT0addr
+    rjmp    _INT0_Handler
 
-	.org	URXCaddr
-	rjmp	_USART_RX_COMPLETE
+    .org    INT1addr
+    rjmp    _INT1_Handler
 
-;------------------------------------------------------
+    .org    URXCaddr
+    rjmp    _USART_RX_COMPLETE
 
+; ==============================================================================
+; Constants
+; ==============================================================================
+
+; AY_TABLE
 #if VOLUME_TABLE == 0
-	Volumes: ; volume table for amplitude
-		.db 0,1,1,1,2,2,3,5,6,9,13,17,22,29,36,45 // AY_TABLE
-	EVolumes: ; volume table for envelopes
-		.db 0,0,1,1,1,1,1,1,2,2,2,2,3,3,5,5,6,6,7,9,11,13,15,17,19,22,25,29,32,36,40,45 // AY_TABLE
+Volumes:    ; volume table for amplitude
+    .db     0,1,1,1,2,2,3,5,6,9,13,17,22,29,36,45
+EVolumes:   ; volume table for envelopes
+    .db     0,0,1,1,1,1,1,1,2,2,2,2,3,3,5,5,6,6,7,9,11,13,15,17,19,22,25,29,32,36,40,45
+
+; YM_TABLE
 #elif VOLUME_TABLE == 1
-	Volumes: ; volume table for amplitude
-		.db 0,1,1,1,2,2,3,4,5,7,10,13,18,24,34,45 // YM_TABLE
-	EVolumes: ; volume table for envelopes
-		.db 0,0,1,1,1,1,1,1,2,2,2,2,2,3,3,4,4,5,6,7,8,10,11,13,15,18,21,24,29,34,40,45 // YM_TABLE
+Volumes:    ; volume table for amplitude
+    .db     0,1,1,1,2,2,3,4,5,7,10,13,18,24,34,45
+EVolumes:   ; volume table for envelopes
+    .db     0,0,1,1,1,1,1,1,2,2,2,2,2,3,3,4,4,5,6,7,8,10,11,13,15,18,21,24,29,34,40,45
+
+; ALT_TABLE
 #elif VOLUME_TABLE == 2
-	Volumes: ; volume table for amplitude
-		.db 0,1,2,3,4,5,6,7,9,11,13,16,22,31,42,58 // ALT_TABLE
-	EVolumes: ; volume table for envelopes
-		.db 0,1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,22,24,26,28,30,33,36,40,45,51,58 // ALT_TABLE
+Volumes:    ; volume table for amplitude
+    .db     0,1,2,3,4,5,6,7,9,11,13,16,22,31,42,58
+EVolumes:   ; volume table for envelopes
+    .db     0,1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,22,24,26,28,30,33,36,40,45,51,58
 #endif
 
-
-; envelope codes, bit0 - attack, bit1 - invert on next cycle, bit2 - stop generator on next cycle
+; envelope codes:
+;   bit0 - attack,
+;   bit1 - invert on next cycle,
+;   bit2 - stop generator on next cycle
 Envelopes:
-	.db 7,7,7,7,4,4,4,4,1,7,3,5,0,6,2,4
+    .db     7,7,7,7,4,4,4,4,1,7,3,5,0,6,2,4
 
 ; mask applied to registers values after receiving
 RegsMask:
-	.db 0xFF,0x0F,0xFF,0x0F,0xFF,0x0F,0x1F,0xFF,0x1F,0x1F,0x1F,0xFF,0xFF,0x0F,0xFF,0xFF
+    .db     0xFF,0x0F,0xFF,0x0F,0xFF,0x0F,0x1F,0xFF,0x1F,0x1F,0x1F,0xFF,0xFF,0x0F,0xFF,0xFF
 
+; ==============================================================================
+; Parallel communication mode: INT0 Handler (BC1 on PD2)
+; ==============================================================================
+_INT0_Handler:                      ; [4] enter interrupt
+    sbic    PinD, b3                ; [1] check BDIR bit, skip next if clear
+    rjmp    LATCH_REG_ADDR0         ; [2]
 
-;==========================================================
-_INT0_Handler:					; 4 cycle to enter interrupt
-	sbic	PinD,b3				; check BDIR bit, skip next if clear // 1 cycle
-	rjmp	LATCH_REG_ADDR0	// 2 cycle
-	; [= READ MODE =] (BC1=1,BDIR=0) 350ns max to set data bus, 8 cycles to set
-	; 8 * 37ns = 296ns for 27MHz O.K.
-	; 8 * 40ns = 320ns for 25MHz O.K.
-	; 8 * 42ns = 336ns for 24MHz O.K.
-	; 8 * 50ns = 400ns for 20MHz !!!!
-	; turn pins to output
-	out		DDRD,BusOut2		// 1 cycle
-	out		DDRC,BusOut1		// 1 cycle	
-LOOP_NOT_INACTIVE:				// loop while BC1=1
-	; 400ns max for release data bus, 9 cycles min
-	; 9 * 50 = 450ns for 20MHz !!!!
-	; 9 * 42 = 378ns for 24MHz O.K.
-	; 9 * 40 = 360ns for 25MHz O.K.
-	; 9 * 37 = 333ns for 27MHz O.K.
-	sbic	PinD,b2	// 1 cycle
-	rjmp	LOOP_NOT_INACTIVE	// 2 cycle
-	; turn pins to input
-	out		DDRC,C00			// 1 cycle
-	out		DDRD,C00			// 1 cycle
-	reti						; 4 cycle to leave interrupt
+    ; [ READ MODE ] (BC1=1, BDIR=0)
+    ; --------------------------------------------------------------------------
+    ; 350ns max to set data bus, 8 cycles to set
+    ; 8 * 37ns = 296ns for 27MHz O.K.
+    ; 8 * 40ns = 320ns for 25MHz O.K.
+    ; 8 * 42ns = 336ns for 24MHz O.K.
+    ; 8 * 50ns = 400ns for 20MHz !!!!
+
+    ; turn pins to output
+    out     DDRD, BusOut2           ; [1]
+    out     DDRC, BusOut1           ; [1]
+
+LOOP_NOT_INACTIVE:                  ; loop while BC1=1
+    ; 400ns max for release data bus, 9 cycles min
+    ; 9 * 50 = 450ns for 20MHz !!!!
+    ; 9 * 42 = 378ns for 24MHz O.K.
+    ; 9 * 40 = 360ns for 25MHz O.K.
+    ; 9 * 37 = 333ns for 27MHz O.K.
+    sbic    PinD, b2                ; [1]
+    rjmp    LOOP_NOT_INACTIVE       ; [2]
+
+    ; turn pins to input
+    out     DDRC, C00               ; [1]
+    out     DDRD, C00               ; [1]
+    reti                            ; [4] leave interrupt
 
 LATCH_REG_ADDR0:
-	// LATCH ADDRESS MODE in INT 0 (BC1=1, BDIR=1) ====
-	in	ADDR,PinC		; receive register number
-	ldd	BusOut1,Z+0x20		; load value from SRAM
-	ldd	BusOut2,Z+0x30		; load value from SRAM
+    ; [ LATCH ADDRESS MODE ] (BC1=1, BDIR=1)
+    ; --------------------------------------------------------------------------
+    in      ADDR, PinC              ; [ ] receive register number
+    ldd     BusOut1, Z+0x20         ; [ ] load value from SRAM
+    ldd     BusOut2, Z+0x30         ; [ ] load value from SRAM
 #if MCU_TYPE == 0
-	out	GIFR,CC0		; reset ext. interrupt flags
+    out     GIFR, CC0               ; [ ] reset ext. interrupt flags
 #else
-	out	EIFR,YH		; reset ext. interrupt flags
+    out     EIFR, YH                ; [ ] reset ext. interrupt flags
 #endif
-	reti
+    reti                            ; [4] leave interrupt
 
-;==========================================================
-_INT1_Handler:	// 4 cycle to enter interrupt
-	in		BusData,PinC
-	sbic	PinD,b2			// 1 cycle
-	rjmp	LATCH_REG_ADDR1	// 2 cycle
-	; [= WRITE REGISTER MODE =] (BC=0, BDIR=1) ============= // 33 cycles
-	; 1950 ns min
-	; 33 * 50 = 1650ns for 20MHz O.K.
-	; 33 * 42 = 1386ns for 24MHz O.K.
-	; 33 * 40 = 1320ns for 25MHz O.K.
-	; 33 * 37 = 1221ns for 27MHz O.K.
-	in		BusOut1,PinD		// 1 cycle
-	in		SREGSave,SREG		; save SREG	// 1 cycle
-	and		BusOut1,CC0			// 1 cycle
-	or		BusData,BusOut1		; construct register value from 2 ports // 1 cycle
-	mov		BusOut1,BusData		// 1 cycle
-	com		BusOut1				; invert register value	// 1 cycle
-	std		Z+0x20,BusOut1		; put inverted register value to SRAM for read mode // 2 cycle
+; ==============================================================================
+; Parallel communication mode: INT1 Handler (BDIR on PD3)
+; ==============================================================================
+_INT1_Handler:                      ; [4] enter interrupt
+    in      BusData, PinC           ; [ ]
+    sbic    PinD, b2                ; [1]
+    rjmp    LATCH_REG_ADDR1         ; [2]
 
-	ld		BusOut2,Z         	; Load register mask from SRAM // 2 cycle
-	and		BusData,BusOut2		; apply register mask // 1 cycle
+    ; [ WRITE REGISTER MODE ] (BC1=0, BDIR=1)
+    ; --------------------------------------------------------------------------
+    ; 1950ns min, 33 cycles
+    ; 33 * 50 = 1650ns for 20MHz O.K.
+    ; 33 * 42 = 1386ns for 24MHz O.K.
+    ; 33 * 40 = 1320ns for 25MHz O.K.
+    ; 33 * 37 = 1221ns for 27MHz O.K.
+    in      BusOut1, PinD           ; [1]
+    in      SREGSave, SREG          ; [1] save SREG
+    and     BusOut1, CC0            ; [1]
+    or      BusData, BusOut1        ; [1] construct register value from 2 ports
+    mov     BusOut1, BusData        ; [1]
+    com     BusOut1                 ; [1] invert register value
+    std     Z+0x20, BusOut1         ; [2] put inverted register value to SRAM for read mode
 
-	mov		BusOut2,BusOut1		// 1 cycle
-	and		BusOut2,CC0			// 1 cycle
-	std		Z+0x30,BusOut2		; put inverted register value to SRAM for read mode (2 high bits) // 2 cycle
-	std		Z+0x10,BusData		; put register value to SRAM	// 2 cycle
-	cpi		ADDR,0x0D			; check for register 13	// 1 cycle
-	brne	NO_ENVELOPE_CHANGED_P	// 1 cycle
-	ori		TNLevel,0x80		; set flag that register 13 changed // 1 cycle
+    ld      BusOut2, Z              ; [2] load register mask from SRAM
+    and     BusData, BusOut2        ; [1] apply register mask
+
+    mov     BusOut2, BusOut1        ; [1]
+    and     BusOut2, CC0            ; [1]
+    std     Z+0x30, BusOut2         ; [2] put inverted register value to SRAM for read mode (2 high bits)
+    std     Z+0x10, BusData         ; [2] put register value to SRAM
+    cpi     ADDR, 0x0D              ; [1] check for register 13
+    brne    NO_ENVELOPE_CHANGED_P   ; [1]
+    ori     TNLevel, 0x80           ; [1] set flag that register 13 changed
+
 NO_ENVELOPE_CHANGED_P:
-	out		SREG,SREGSave		// 1 cycle
-	reti						; 4 cycle to leave interrupt
+    out     SREG, SREGSave          ; [1]
+    reti                            ; [4] leave interrupt
 
 LATCH_REG_ADDR1:
-	; [= LATCH ADDRESS MODE =] (BC1=1, BDIR=1) 350ns min, 16 cycles
-	; 16 * 50 = 800ns for 20MHz mb O.K., but hz :)))
-	; 16 * 42 = 672ns for 24MHz mb O.K.
-	; 16 * 40 = 640ns for 25MHz mb O.K.
-	; 16 * 37 = 592ns for 27MHz mb O.K.
-	mov		ADDR,BusData	; receive register number
-	ldd		BusOut1,Z+0x20		; load value from SRAM	// 2 cycle
-	ldd		BusOut2,Z+0x30		; load value from SRAM	// 2 cycle
+    ; [ LATCH ADDRESS MODE ] (BC1=1, BDIR=1)
+    ; --------------------------------------------------------------------------
+    ; 350ns min, 16 cycles
+    ; 16 * 50 = 800ns for 20MHz mb O.K., but hz :)))
+    ; 16 * 42 = 672ns for 24MHz mb O.K.
+    ; 16 * 40 = 640ns for 25MHz mb O.K.
+    ; 16 * 37 = 592ns for 27MHz mb O.K.
+    mov     ADDR, BusData           ; [ ] receive register number
+    ldd     BusOut1, Z+0x20         ; [2] load value from SRAM
+    ldd     BusOut2, Z+0x30         ; [2] load value from SRAM
 #if MCU_TYPE == 0
-	out	GIFR,CC0		; reset ext. interrupt flags
+    out     GIFR, CC0               ; [ ] reset ext. interrupt flags
 #else
-	out	EIFR,ZH		; reset ext. interrupt flags
+    out     EIFR, ZH                ; [ ] reset ext. interrupt flags
 #endif
-	reti						; 4 cycle to leave interrupt
+    reti                            ; [4] leave interrupt
 
-
-;==========================================================
+; ==============================================================================
+; Serial communication mode: URXC Handler
+; ==============================================================================
 _USART_RX_COMPLETE:
 #if MCU_TYPE == 0
-	in		BusData,UDR			; get byte from USART
+    in      BusData, UDR            ; get byte from USART
 #else
-	lds		BusData,UDR0
+    lds     BusData, UDR0           ; get byte from USART
 #endif
-	sbrs	ADDR,b4				; check for address/data mode
-	rjmp	RECV_REG_VALUE
-	sbrc	BusData,b7
-	rjmp	USART_SYNC
-	mov		ADDR,BusData        ; ------ receive register number ------------
-	reti
-USART_SYNC:						; ------ synchronization mode ---------------
-	ldi		ADDR,0x10
-	reti
+    sbrs    ADDR, b4                ; check for address/data mode
+    rjmp    RECV_REG_VALUE
+    sbrc    BusData, b7
+    rjmp    USART_SYNC
+    mov     ADDR, BusData           ; <= receive register number
+    reti
 
-RECV_REG_VALUE:					; ------ receive register value -------------
-	in		SREGSave,SREG
-	ld		BusOut1,Z			; load register mask
-	and		BusData,BusOut1		; apply register mask
-	std		Z+0x10,BusData		; put register value to SRAM
-	cpi		ADDR,0x0D			; check for envelope shape register
-	brne	NO_ENVELOPE_CHANGED_S
-	ori		TNLevel,0x80		; set envelope change flag (bit 7)
+USART_SYNC:                         ; <= synchronization mode
+    ldi     ADDR,0x10
+    reti
+
+RECV_REG_VALUE:                     ; <= receive register value
+    in      SREGSave, SREG
+    ld      BusOut1, Z              ; load register mask
+    and     BusData, BusOut1        ; apply register mask
+    std     Z+0x10, BusData         ; put register value to SRAM
+    cpi     ADDR, 0x0D              ; check for envelope shape register
+    brne    NO_ENVELOPE_CHANGED_S
+    ori     TNLevel, 0x80           ; set envelope change flag (bit 7)
+
 NO_ENVELOPE_CHANGED_S:
-	ldi		ADDR,0x10			; set bit 4 to jump to receive register number on next byte received
-	out		SREG,SREGSave
-	reti
+    ldi     ADDR, 0x10              ; set bit 4 to jump to receive register number on next byte received
+    out     SREG, SREGSave
+    reti
 
-
-;==========================================================
-_RESET: // Emulator start
-
+; ==============================================================================
+; Entry point
+; ==============================================================================
+_RESET:
 #if MCU_TYPE == 0
-	in		r16,SFIOR			; 1-> PUD for Atmega8
-	sbr		r16,PUD
-	out		SFIOR,r16
+    in		r16,SFIOR			; 1-> PUD for Atmega8
+    sbr		r16,PUD
+    out		SFIOR,r16
 #else
-	in		r16,MCUCR			; 1-> PUD for Atmega48/88/168/328
-	sbr		r16,PUD
-	out		MCUCR,r16
+    in		r16,MCUCR			; 1-> PUD for Atmega48/88/168/328
+    sbr		r16,PUD
+    out		MCUCR,r16
 #endif
 
-	// init stack pointer at end of RAM
-	ldi		r16,low(RAMEND)
-	out		SPL,r16
-	ldi		r16,high(RAMEND)
-	out		SPH,r16
+    ; init stack pointer at end of RAM
+    ldi		r16,low(RAMEND)
+    out		SPL,r16
+    ldi		r16,high(RAMEND)
+    out		SPH,r16
 
-	; disable Analog Comparator ==============================
+    ; disable Analog Comparator
 #if MCU_TYPE == 0
-	sbi		ACSR,ACD			; for atmega8
+    sbi		ACSR,ACD			; for atmega8
 #else
-	in		r16,ACSR			; for ATMEGA48/88/168/328
-	sbr		r16,ACD
-	out		ACSR,r16
-#endif	
-	;=========================================================
+    in		r16,ACSR			; for ATMEGA48/88/168/328
+    sbr		r16,ACD
+    out		ACSR,r16
+#endif
 
-	// init constants
-	clr		C00
-	ldi		r16,0xC0
-	mov		CC0,r16
-	ldi		r16,0x04
-	mov		C04,r16
-	ldi		r16,0x1F
-	mov		C1F,r16
-	ldi		r16,0xFF
-	mov		BusOut1,r16
-	mov		BusOut2,CC0
-	clr		RNGH
+    ; init constants
+    clr		C00
+    ldi		r16,0xC0
+    mov		CC0,r16
+    ldi		r16,0x04
+    mov		C04,r16
+    ldi		r16,0x1F
+    mov		C1F,r16
+    ldi		r16,0xFF
+    mov		BusOut1,r16
+    mov		BusOut2,CC0
+    clr		RNGH
 
-	// clear register values in SRAM 0x110-0x13F
-	ldi		r18,0x10
-	ldi		ZL,0x10
-	ldi		ZH,0x01
+    ; clear register values in SRAM 0x110-0x13F
+    ldi		r18,0x10
+    ldi		ZL,0x10
+    ldi		ZH,0x01
+
 LOOP0:
-	std		Z+0x20,CC0
-	std		Z+0x10,r16
-	st		Z+,C00
-	dec		r18
-	brne	LOOP0
+    std		Z+0x20,CC0
+    std		Z+0x10,r16
+    st		Z+,C00
+    dec		r18
+    brne	LOOP0
 
-	; load envelope codes to SRAM 0x210, 16 bytes
-	ldi		xh,0x02
-	ldi		xl,0x10
-	ldi 	zl, low(2*Envelopes)
-	ldi 	zh, high(2*Envelopes)
-	ldi		r18,0x10
-	rcall	_COPY
+    ; load envelope codes to SRAM 0x210, 16 bytes
+    ldi		xh,0x02
+    ldi		xl,0x10
+    ldi 	zl, low(2*Envelopes)
+    ldi 	zh, high(2*Envelopes)
+    ldi		r18,0x10
+    rcall	_COPY
 
-	; load volume table for amplitude to SRAM 0x220, 16 bytes
-	ldi		xl,0x20
-	ldi 	zl, low(2*Volumes)
-	ldi 	zh, high(2*Volumes)
-	ldi		r18,0x10
-	rcall	_COPY
+    ; load volume table for amplitude to SRAM 0x220, 16 bytes
+    ldi		xl,0x20
+    ldi 	zl, low(2*Volumes)
+    ldi 	zh, high(2*Volumes)
+    ldi		r18,0x10
+    rcall	_COPY
 
-	; load volume table for envelopes to SRAM 0x230, 32 bytes
-	ldi		xl,0x30
-	ldi 	zl, low(2*EVolumes)
-	ldi 	zh, high(2*EVolumes)
-	ldi		r18,0x20
-	rcall	_COPY
+    ; load volume table for envelopes to SRAM 0x230, 32 bytes
+    ldi		xl,0x30
+    ldi 	zl, low(2*EVolumes)
+    ldi 	zh, high(2*EVolumes)
+    ldi		r18,0x20
+    rcall	_COPY
 
-	; load register masks to SRAM 0x100, 16 bytes
-	clr		xl
-	ldi		xh,0x01
-	ldi 	zl, low(2*RegsMask)
-	ldi 	zh, high(2*RegsMask)
-	ldi		r18,0x10
-	rcall	_COPY
+    ; load register masks to SRAM 0x100, 16 bytes
+    clr		xl
+    ldi		xh,0x01
+    ldi 	zl, low(2*RegsMask)
+    ldi 	zh, high(2*RegsMask)
+    ldi		r18,0x10
+    rcall	_COPY
 
 
-	ldi		ZH,0x01		; set high byte of register Z for fast acces to register values
-	ldi		YH,0x02		; set high byte of register Y for fast acces to volume table
-	mov		NoiseAddon,ZH	; load default value = 1 to high bit of noise generator
+    ldi		ZH,0x01		; set high byte of register Z for fast acces to register values
+    ldi		YH,0x02		; set high byte of register Y for fast acces to volume table
+    mov		NoiseAddon,ZH	; load default value = 1 to high bit of noise generator
 
-	; get byte 0 from EEPROM, check value > 0 or skip USART initialization if value = 0
+    ; get byte 0 from EEPROM, check value > 0 or skip USART initialization if value = 0
 #if MCU_TYPE == 0 ||  MCU_TYPE > 1
-	out		EEARH,C00		; is absent in Atmega48
+    out		EEARH,C00		; is absent in Atmega48
 #endif
-	out		EEARL,C00
-	sbi		EECR,b0
-	in		r16,EEDR
-	cp		r16,C00
-	breq	NO_USART
+    out		EEARL,C00
+    sbi		EECR,b0
+    in		r16,EEDR
+    cp		r16,C00
+    breq	NO_USART
 
-	// init USART
-	clr		r16
+    ; init USART
+    clr		r16
 #if MCU_TYPE == 0
-	out		UBRRH,r16
-	ldi		r16,0x86
-	out		UCSRC,r16
-	ldi		r16,0x02
-	out		UCSRA,r16
-	ldi		r16,0x90
-	out		UCSRB,r16
+    out		UBRRH,r16
+    ldi		r16,0x86
+    out		UCSRC,r16
+    ldi		r16,0x02
+    out		UCSRA,r16
+    ldi		r16,0x90
+    out		UCSRB,r16
 #else
-	sts		UBRR0H,r16
-	ldi		r16,0x06
-	sts		UCSR0C,r16
-	ldi		r16,0x02
-	sts		UCSR0A,r16
-	ldi		r16,0x90
-	sts		UCSR0B,r16
+    sts		UBRR0H,r16
+    ldi		r16,0x06
+    sts		UCSR0C,r16
+    ldi		r16,0x02
+    sts		UCSR0A,r16
+    ldi		r16,0x90
+    sts		UCSR0B,r16
 #endif
-	ldi		r16,0x03
-	out		EEARL,r16
-	sbi		EECR,b0
-	in		r18,EEDR
+    ldi		r16,0x03
+    out		EEARL,r16
+    sbi		EECR,b0
+    in		r18,EEDR
 #if MCU_TYPE == 0
-	out		UBRRL,r18
+    out		UBRRL,r18
 #else
-	sts		UBRR0L,r18
+    sts		UBRR0L,r18
 #endif
 NO_USART:
 
-	// init Timer1
+    ; init Timer1
 #if MCU_TYPE == 0
-	out		OCR1AH,C00		; clear OCR values
-	out		OCR1AL,C00
-	out		OCR1BH,C00
-	out		OCR1BL,C00
+    out		OCR1AH,C00		; clear OCR values
+    out		OCR1AL,C00
+    out		OCR1BH,C00
+    out		OCR1BL,C00
 #else
-	sts		OCR1AH,C00		; clear OCR values
-	sts		OCR1AL,C00
-	sts		OCR1BH,C00
-	sts		OCR1BL,C00
+    sts		OCR1AH,C00		; clear OCR values
+    sts		OCR1AL,C00
+    sts		OCR1BH,C00
+    sts		OCR1BL,C00
 #endif
-	sbi		DDRB,b1			; set port B pin 1 to output for PWM (AY channel A)
-	sbi		DDRB,b2			; set port B pin 2 to output for PWM (AY channel B)
-	ldi		r16,0xA2
+    sbi		DDRB,b1			; set port B pin 1 to output for PWM (AY channel A)
+    sbi		DDRB,b2			; set port B pin 2 to output for PWM (AY channel B)
+    ldi		r16,0xA2
 #if MCU_TYPE == 0
-	out		TCCR1A,r16
+    out		TCCR1A,r16
 #else
-	sts		TCCR1A,r16
-	ldi		r16,0x19
-	sts		TCCR1B,r16
+    sts		TCCR1A,r16
+    ldi		r16,0x19
+    sts		TCCR1B,r16
 #endif
-	ldi		r16,0x19
+    ldi		r16,0x19
 #if MCU_TYPE == 0
-	out		TCCR1B,r16
+    out		TCCR1B,r16
 #else
-	sts		TCCR1B,r16
+    sts		TCCR1B,r16
 #endif
-	out		EEARL,YH		; set EEPROM address 2
-	sbi		EECR,b0
-	in		r18,EEDR		; load byte 2 from EEPROM to r18
+    out		EEARL,YH		; set EEPROM address 2
+    sbi		EECR,b0
+    in		r18,EEDR		; load byte 2 from EEPROM to r18
 #if MCU_TYPE == 0
-	out		ICR1H,C00
-	out		ICR1L,r18		; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
+    out		ICR1H,C00
+    out		ICR1L,r18		; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
 #else
-	sts		ICR1H,C00
-	sts		ICR1L,r18		; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
+    sts		ICR1H,C00
+    sts		ICR1L,r18		; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
 #endif
-	; ICR1L value formula (28000000/109375/2 - 1) where 28000000 = 28MHz - AVR oscillator frequency
-	; 109375 is for 1.75 MHz version, formula is (PSG frequency / 16) e.g. for 2MHz it is 2000000/16 = 125000
+    ; ICR1L value formula (28000000/109375/2 - 1) where 28000000 = 28MHz - AVR oscillator frequency
+    ; 109375 is for 1.75 MHz version, formula is (PSG frequency / 16) e.g. for 2MHz it is 2000000/16 = 125000
 
 #if CHANNELS == 3
-	// init Timer2
-	sbi		DDRB,DDB3		; set port B pin 3 to output for PWM (AY channel C)
-	#if MCU_TYPE == 0
-		ldi	r16,0x69
-		out	TCCR2,r16
-	#else
-		ldi	r16,0x83
-		sts	TCCR2A,r16
-		ldi	r16,0x01
-		sts	TCCR2B,r16
-	#endif
+    ; init Timer2
+    sbi		DDRB,DDB3		; set port B pin 3 to output for PWM (AY channel C)
+#if MCU_TYPE == 0
+    ldi	r16,0x69
+    out	TCCR2,r16
+#else
+    ldi	r16,0x83
+    sts	TCCR2A,r16
+    ldi	r16,0x01
+    sts	TCCR2B,r16
+#endif
 #endif
 
-	// check for external interrupts enabled in byte 1 of EEPROM
-	out		EEARL,ZH
-	sbi		EECR,b0
-	in		r16,EEDR
-	cp		r16,C00
-	breq	NO_EXT_INT
+    ;check for external interrupts enabled in byte 1 of EEPROM
+    out		EEARL,ZH
+    sbi		EECR,b0
+    in		r16,EEDR
+    cp		r16,C00
+    breq	NO_EXT_INT
 
 #if MCU_TYPE == 0
-	; set INT0,INT1 ATMEGA8 ====================================
-	// external interrupts initialization
-	ldi		r16,0x0F		; fallen edge of INT0, INT1
-	out		MCUCR,r16
-	out		GIFR,CC0		; clear interrupt flags
-	out		GICR,CC0		; enable interrupts
+    ; set INT0,INT1 ATMEGA8 ====================================
+    // external interrupts initialization
+    ldi		r16,0x0F		; fallen edge of INT0, INT1
+    out		MCUCR,r16
+    out		GIFR,CC0		; clear interrupt flags
+    out		GICR,CC0		; enable interrupts
     ; ==========================================================
 #else
-	; set INT0,INT1 ATMEGA48/88/168/328 ========================
-	ldi		r16,0x0F		; fallen edge of INT0, INT1
-	sts		EICRA,r16
-	ldi		r16,0x03
-	out		EIFR,r16
-	out		EIMSK,r16
-	; ==========================================================
+    ; set INT0,INT1 ATMEGA48/88/168/328 ========================
+    ldi		r16,0x0F		; fallen edge of INT0, INT1
+    sts		EICRA,r16
+    ldi		r16,0x03
+    out		EIFR,r16
+    out		EIMSK,r16
+    ; ==========================================================
 #endif
-
 NO_EXT_INT:
 
-	// init constants and variables second part
-	ldi		ADDR,0x10
-	clr		TNLevel
-	clr		OutA
-	clr		OutB
-	clr		OutC
-	mov		TabP,CC0		; set envelope generator disablet by default
-	clr		TabE
-	clr		BusData
-	clr		CntN
-	clr		CntAL
-	clr		CntAH
-	movw	CntBL,CntAL
-	movw	CntCL,CntAL
-	movw	CntEL,CntAL
-	clr		EVal
-	sei						; enable global interrupts
+    ; init constants and variables second part
+    ldi		ADDR,0x10
+    clr		TNLevel
+    clr		OutA
+    clr		OutB
+    clr		OutC
+    mov		TabP,CC0		; set envelope generator disablet by default
+    clr		TabE
+    clr		BusData
+    clr		CntN
+    clr		CntAL
+    clr		CntAH
+    movw	CntBL,CntAL
+    movw	CntCL,CntAL
+    movw	CntEL,CntAL
+    clr		EVal
+    sei						; enable global interrupts
 
+; ==============================================================================
+; Main Loop
+; ==============================================================================
 _MAIN_LOOP:
-	// MAIN LOOP ========================================================================
 #if MCU_TYPE == 0
 	in		YL,TIFR			; check timer1 overflow flag TOV1
 	sbrs	YL,TOV1
@@ -651,50 +685,52 @@ CH_C_NO_CHANGE:
 	rjmp	_MAIN_LOOP
 	// MAIN LOOP END ====================================================================
 
+; ==============================================================================
+; Subroutines
+; ==============================================================================
+_COPY:                      ; copy from flash to SRAM
+    lpm	    r16, Z+
+    st      X+, r16
+    dec     r18
+    brne    _COPY
+    ret
 
-// copy routine from flash to SRAM
-_COPY:
-	lpm		r16,Z+
-	st		X+,r16
-	dec		r18
-	brne	_COPY
-	ret
+    ; data segment starts here
+    .dseg
 
-
-/////////////////////////////////////////////////////////////////
-/// AY REGISTERS IN SRAM
-/////////////////////////////////////////////////////////////////
-	.dseg
-	.org	0x0110
+; ==============================================================================
+; PSG Registers in SRAM
+; ==============================================================================
+    .org    0x0110
 AY_REG00:
-	.byte	1
+    .byte   1
 AY_REG01:
-	.byte	1
+    .byte   1
 AY_REG02:
-	.byte	1
+    .byte   1
 AY_REG03:
-	.byte	1
+    .byte   1
 AY_REG04:
-	.byte	1
+    .byte   1
 AY_REG05:
-	.byte	1
+    .byte   1
 AY_REG06:
-	.byte	1
+    .byte   1
 AY_REG07:
-	.byte	1
+    .byte   1
 AY_REG08:
-	.byte	1
+    .byte   1
 AY_REG09:
-	.byte	1
+    .byte   1
 AY_REG10:
-	.byte	1
+    .byte   1
 AY_REG11:
-	.byte	1
+    .byte   1
 AY_REG12:
-	.byte	1
+    .byte   1
 AY_REG13:
-	.byte	1
+    .byte   1
 AY_REG14:
-	.byte	1
+    .byte   1
 AY_REG15:
-	.byte	1
+    .byte   1
