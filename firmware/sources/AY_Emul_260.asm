@@ -16,6 +16,12 @@
 #define VOLUME_TABLE 0 ; 0 - AY, 1 - YM, 2 - ALTERNATE volume table
 #define MCU_TYPE     2 ; 0 - Atmega8, 1 - Atmega48, 2 - Atmega88/168/328
 
+; EEPROM Config:
+; byte 0 - Serial interface enable (1 - enabled)
+; byte 1 - Parallel interface enable (1 - enabled)
+; byte 2 - PWM speed depending on AY chip frequency and MCU clock frequency
+; byte 3 - USART baud speed depending on MCU clock frequency
+
 ; ==============================================================================
 ; Declarations & definitions
 ; ==============================================================================
@@ -86,23 +92,26 @@
 ; AY_TABLE
 #if VOLUME_TABLE == 0
 Volumes:    ; volume table for amplitude
-    .db     0,1,1,1,2,2,3,5,6,9,13,17,22,29,36,45
+    .db     0, 1, 1, 1, 2, 2, 3, 5, 6, 9, 13, 17, 22, 29, 36, 45
 EVolumes:   ; volume table for envelopes
-    .db     0,0,1,1,1,1,1,1,2,2,2,2,3,3,5,5,6,6,7,9,11,13,15,17,19,22,25,29,32,36,40,45
+    .db     0, 0, 1, 1,  1,  1,  1,  1,  2,  2,  2,  2,  3,  3,  5,  5
+    .db     6, 6, 7, 9, 11, 13, 15, 17, 19, 22, 25, 29, 32, 36, 40, 45
 
 ; YM_TABLE
 #elif VOLUME_TABLE == 1
 Volumes:    ; volume table for amplitude
-    .db     0,1,1,1,2,2,3,4,5,7,10,13,18,24,34,45
+    .db     0, 1, 1, 1, 2, 2, 3, 4, 5, 7, 10, 13, 18, 24, 34, 45
 EVolumes:   ; volume table for envelopes
-    .db     0,0,1,1,1,1,1,1,2,2,2,2,2,3,3,4,4,5,6,7,8,10,11,13,15,18,21,24,29,34,40,45
+    .db     0, 0, 1, 1, 1,  1,  1,  1,  2,  2,  2,  2,  2,  3,  3,  4
+    .db     4, 5, 6, 7, 8, 10, 11, 13, 15, 18, 21, 24, 29, 34, 40, 45
 
 ; ALT_TABLE
 #elif VOLUME_TABLE == 2
 Volumes:    ; volume table for amplitude
-    .db     0,1,2,3,4,5,6,7,9,11,13,16,22,31,42,58
+    .db     0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 16, 22, 31, 42, 58
 EVolumes:   ; volume table for envelopes
-    .db     0,1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,20,22,24,26,28,30,33,36,40,45,51,58
+    .db     0,   1,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14
+    .db     15, 16, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 40, 45, 51, 58
 #endif
 
 ; envelope codes:
@@ -110,18 +119,19 @@ EVolumes:   ; volume table for envelopes
 ;   bit1 - invert on next cycle,
 ;   bit2 - stop generator on next cycle
 Envelopes:
-    .db     7,7,7,7,4,4,4,4,1,7,3,5,0,6,2,4
+    .db     7, 7, 7, 7, 4, 4, 4, 4, 1, 7, 3, 5, 0, 6, 2, 4
 
 ; mask applied to registers values after receiving
 RegsMask:
-    .db     0xFF,0x0F,0xFF,0x0F,0xFF,0x0F,0x1F,0xFF,0x1F,0x1F,0x1F,0xFF,0xFF,0x0F,0xFF,0xFF
+    .db     0xFF, 0x0F, 0xFF, 0x0F, 0xFF, 0x0F, 0x1F, 0xFF ; reg00 - reg07
+    .db     0x1F, 0x1F, 0x1F, 0xFF, 0xFF, 0x0F, 0xFF, 0xFF ; reg08 - reg15
 
 ; ==============================================================================
-; Parallel communication mode: INT0 Handler (BC1 on PD2)
+; Parallel communication mode (BC1 on PD2/INT0, BDIR on PD3/INT1)
 ; ==============================================================================
 _INT0_Handler:                      ; [4] enter interrupt
-    sbic    PinD, b3                ; [1] check BDIR bit, skip next if clear
-    rjmp    LATCH_REG_ADDR0         ; [2]
+    sbic    PinD, b3                ; [2/1] check BDIR bit, skip next if clear
+    rjmp    LATCH_REG_ADDR0         ; [0/2]
 
     ; [ READ MODE ] (BC1=1, BDIR=0)
     ; --------------------------------------------------------------------------
@@ -130,9 +140,7 @@ _INT0_Handler:                      ; [4] enter interrupt
     ; 8 * 40ns = 320ns for 25MHz O.K.
     ; 8 * 42ns = 336ns for 24MHz O.K.
     ; 8 * 50ns = 400ns for 20MHz !!!!
-
-    ; turn pins to output
-    out     DDRD, BusOut2           ; [1]
+    out     DDRD, BusOut2           ; [1] turn pins to output
     out     DDRC, BusOut1           ; [1]
 
 LOOP_NOT_INACTIVE:                  ; loop while BC1=1
@@ -141,15 +149,13 @@ LOOP_NOT_INACTIVE:                  ; loop while BC1=1
     ; 9 * 42 = 378ns for 24MHz O.K.
     ; 9 * 40 = 360ns for 25MHz O.K.
     ; 9 * 37 = 333ns for 27MHz O.K.
-    sbic    PinD, b2                ; [1]
-    rjmp    LOOP_NOT_INACTIVE       ; [2]
-
-    ; turn pins to input
-    out     DDRC, C00               ; [1]
+    sbic    PinD, b2                ; [2/1] check BC1 bit, skip next if clear
+    rjmp    LOOP_NOT_INACTIVE       ; [0/2]
+    out     DDRC, C00               ; [1] turn pins to input
     out     DDRD, C00               ; [1]
     reti                            ; [4] leave interrupt
 
-LATCH_REG_ADDR0:
+LATCH_REG_ADDR0:                    ; TODO: use common latch reg mode code
     ; [ LATCH ADDRESS MODE ] (BC1=1, BDIR=1)
     ; --------------------------------------------------------------------------
     in      ADDR, PinC              ; [ ] receive register number
@@ -162,13 +168,10 @@ LATCH_REG_ADDR0:
 #endif
     reti                            ; [4] leave interrupt
 
-; ==============================================================================
-; Parallel communication mode: INT1 Handler (BDIR on PD3)
-; ==============================================================================
 _INT1_Handler:                      ; [4] enter interrupt
-    in      BusData, PinC           ; [ ]
-    sbic    PinD, b2                ; [1]
-    rjmp    LATCH_REG_ADDR1         ; [2]
+    in      BusData, PinC           ; [ ] TODO: move to write reg mode
+    sbic    PinD, b2                ; [2/1] check BC1 bit, skip next if clear
+    rjmp    LATCH_REG_ADDR1         ; [0/2]
 
     ; [ WRITE REGISTER MODE ] (BC1=0, BDIR=1)
     ; --------------------------------------------------------------------------
@@ -200,7 +203,7 @@ NO_ENVELOPE_CHANGED_P:
     out     SREG, SREGSave          ; [1]
     reti                            ; [4] leave interrupt
 
-LATCH_REG_ADDR1:
+LATCH_REG_ADDR1:                    ; TODO: use common latch reg mode code
     ; [ LATCH ADDRESS MODE ] (BC1=1, BDIR=1)
     ; --------------------------------------------------------------------------
     ; 350ns min, 16 cycles
@@ -398,21 +401,29 @@ NO_USART:
     sts     OCR1BL, C00
 #endif
     sbi     DDRB, b1                ; set port B pin 1 to output for PWM (AY channel A)
-    sbi     DDRB, b2                ; set port B pin 2 to output for PWM (AY channel B)
-    ldi     r16, 0xA2
+    sbi     DDRB, b2                ; set port B pin 2 to output for PWM (AY channel C)
+
+    ; Waveform generation mode: 14 (Fast PWM, TOP controlled by ICR1)
+    ; Clear OC1A/OC1B on Compare Match, set OC1A/OC1B at BOTTOM (non-inverting mode)
+    ; No prescaling
+    ldi     r16, 0xA2               ; COM1A1+COM1B1+WGM11
 #if MCU_TYPE == 0
     out     TCCR1A, r16
 #else
     sts     TCCR1A, r16
-    ldi     r16, 0x19
-    sts     TCCR1B, r16
+    ldi     r16, 0x19               ; TODO: useless because of the same code further
+    sts     TCCR1B, r16             ; TODO: useless because of the same code further
 #endif
-    ldi     r16, 0x19
+    ldi     r16, 0x19               ; WGM13+WGM12+CS10
 #if MCU_TYPE == 0
     out     TCCR1B, r16
 #else
     sts     TCCR1B, r16
 #endif
+
+    ; Defines the counter's TOP value
+    ; ICR1H = 0
+    ; ICR1L = config
     out     EEARL, YH               ; set EEPROM address 2
     sbi     EECR, b0
     in      r18, EEDR               ; load byte 2 from EEPROM to r18
@@ -431,18 +442,22 @@ NO_USART:
     ; --------------------------------------------------------------------------
 #if CHANNELS == 3
     sbi     DDRB, DDB3              ; set port B pin 3 to output for PWM (AY channel C)
+
+    ; Waveform Generation Mode: 3 (Fast PWM, TOP = 0xFF)
+    ; Clear OC2 on Compare Match, set OC2 at BOTTOM (non-inverting mode)
+    ; No prescaling
 #if MCU_TYPE == 0
-    ldi     r16, 0x69
+    ldi     r16, 0x69               ; WGM20+COM21+WGM21+CS20
     out     TCCR2, r16
 #else
-    ldi     r16, 0x83
+    ldi     r16, 0x83               ; COM2A1+WGM21+WGM20
     sts     TCCR2A, r16
-    ldi     r16, 0x01
+    ldi     r16, 0x01               ; CS20
     sts     TCCR2B, r16
 #endif
 #endif
 
-    ;check for external interrupts enabled in byte 1 of EEPROM
+    ; check for parallel interface enabled in byte 1 of EEPROM
     out     EEARL, ZH
     sbi     EECR, b0
     in      r16, EEDR
@@ -648,9 +663,9 @@ CH_C_NO_CHANGE:
 	// Channel B
 #if CHANNELS == 2
 // two channel version ----------------------------------------
-	mov		YL,OutB
-	lsr		OutB			; TMP = TMP - (TMP/4 + TMP/8);
-	lsr		OutB
+	mov		YL,OutB         ; channel B amplitude lowered to about 63%
+	lsr		OutB			; TMP = TMP - (TMP/4 + TMP/8) eqivalent of
+	lsr		OutB            ; TMP = 0.625 * TMP
 	sub		YL,OutB
 	lsr		OutB
 	sub		YL,OutB
@@ -670,6 +685,8 @@ CH_C_NO_CHANGE:
 // --------------------------------------------------------------
 #if SPEAKER == 1
 // speaker port enabled -----------------------------------------
+    ; TODO: speaker amplitude is about 69% of channel amplitude,
+    ; TODO: probably should be lowered to 63% or lower
 	sbic	PinD,b1			; check PD1 (SPEAKER PORT INPUT) skip if bit is not set
 	add		OutA,C1F		; add some volume to channel A
 	sbic	PinD,b1			; check PD1 (SPEAKER PORT INPUT) skip if bit is not set
