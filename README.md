@@ -27,70 +27,69 @@ This sound chip emulator can be used in conjunction with the [AVR-AY Player](htt
 Following Arduino sketch is for parallel data streaming to a sound chip emulator. Data is received by the Arduino via the corresponding COM port and sent to the chip in parallel. For quick and easy testing, you can use the **AVR-AY Player** as described in the previous section. Just select the COM port of the Arduino board.
 
 ```c
- // connect to D0,1,...,7
-const int ad[8] = { 8, 9, 2, 3, 4, 5, 6, 7 };
+#define LSB_DDR  DDRB
+#define MSB_DDR  DDRD
+#define BUS_DDR  DDRB
 
-const int pinBC1  = 10;
-const int pinBDIR = 11;
+#define LSB_PORT PORTB
+#define MSB_PORT PORTD
+#define BUS_PORT PORTB
 
-// fast pin switching macros
-#define CLR(x,y) (x&=(~(1<<y)))
-#define SET(x,y) (x|=(1<<y))
-#define __BCPORT__ PORTB
-#define __BC1__    2
-#define __BDIR__   3
+#define PIN_BC1  PB2
+#define PIN_BDIR PB3
 
-void send_data(byte address, byte data) {
-  // write address to pins
-  PORTB |= address & 0x03;
-  PORTD |= address & 0xFC;
-  
-  // validate addess
-  __BCPORT__ |= (1 << __BDIR__) + (1 << __BC1__);
-  delayMicroseconds(1);
-  __BCPORT__ &= ~((1 << __BDIR__) + (1 << __BC1__));
-  PORTB &= ~(address & 0x03);
-  PORTD &= ~(address & 0xFC);
+#define SET_DATA(data) { LSB_PORT |=  ((data) & 0b00000011); MSB_PORT |=  ((data) & 0b11111100); }
+#define CLR_DATA(data) { LSB_PORT &= ~((data) & 0b00000011); MSB_PORT &= ~((data) & 0b11111100); }
 
-  // write data to pins
-  PORTB |= data & 0x03;
-  PORTD |= data & 0xFC;
-  
-  // validate data
-  SET(__BCPORT__,__BDIR__);
-  delayMicroseconds(1);
-  CLR(__BCPORT__,__BDIR__);
-  PORTB &= ~(data & 0x03);
-  PORTD &= ~(data & 0xFC);
+void send_to_psg(byte address, byte data)
+{
+    // WRITE REGISTER NUMBER
+    SET_DATA(address);            // write address to pins
+    bitSet(BUS_PORT, PIN_BDIR);   // set BC1+BDIR pins, latch address mode
+    bitSet(BUS_PORT, PIN_BC1);
+    _delay_us(0.500);             // set+hold address delay 500ns (400+100 min)
+    bitClear(BUS_PORT, PIN_BDIR); // clear BC1+BDIR pins, inactive mode
+    bitClear(BUS_PORT, PIN_BC1);
+    CLR_DATA(address);            // reset pins to tristate mode
+
+    // WRITE REGISTER DATA
+    SET_DATA(data);               // write data to pins
+    bitSet(BUS_PORT, PIN_BDIR);   // set BDIR pin, write to reg mode
+    _delay_us(0.250);             // 250ns delay (250min-500max)
+    bitClear(BUS_PORT, PIN_BDIR); // clear BDIR pin, inactive mode
+    CLR_DATA(data);               // reset pins to tristate mode
 }
 
-void setup() {
-  // init pins
-  for (int i=0; i < 8; i++) {
-    pinMode(ad[i], OUTPUT);
-  }
-  pinMode(pinBC1, OUTPUT);
-  pinMode(pinBDIR, OUTPUT);
+void setup()
+{
+    // init pins
+    LSB_DDR |= 0b00000011;
+    MSB_DDR |= 0b11111100;
+    bitSet(BUS_DDR, PIN_BDIR);
+    bitSet(BUS_DDR, PIN_BC1);
 
-  // inactive mode
-  digitalWrite(pinBC1, LOW);
-  digitalWrite(pinBDIR, LOW);
+    // inactive mode
+    bitClear(BUS_PORT, PIN_BDIR);
+    bitClear(BUS_PORT, PIN_BC1);
 
-  // serial init
-  Serial.begin(57600);
+    // serial init
+    Serial.begin(57600);
 }
 
-void loop() {
-  byte reg;
-  while (true) {
-    do {
-      while (Serial.available() < 1) delayMicroseconds(1);
-      reg = Serial.read();
-    } while (reg > 15);
+void loop()
+{
+    while (true)
+    {
+        // wait for register number
+        while (!Serial.available()) delayMicroseconds(1);
+        byte reg = Serial.read();
+        if (reg > 15) continue;
 
-    while (Serial.available() < 1) delayMicroseconds(1);
-    send_data(reg, Serial.read());
-  }
+        // read data and send everything to PSG
+        while (!Serial.available()) delayMicroseconds(1);
+        byte data = Serial.read();
+        send_to_psg(reg, data);
+    }
 }
 ```
 
