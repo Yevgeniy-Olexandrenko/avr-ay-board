@@ -27,50 +27,62 @@ This sound chip emulator can be used in conjunction with the [AVR-AY Player](htt
 Following Arduino sketch is for parallel data streaming to a sound chip emulator. Data is received by the Arduino via the corresponding COM port and sent to the chip in parallel. For quick and easy testing, you can use the **AVR-AY Player** as described in the previous section. Just select the COM port of the Arduino board.
 
 ```c
+#define LSB_PORT PORTB      // data bus bits D0-D1
 #define LSB_DDR  DDRB
+#define MSB_PORT PORTD      // data bus bits D2-D7
 #define MSB_DDR  DDRD
+#define BUS_PORT PORTB      // control bus BC1 and BDIR pins
 #define BUS_DDR  DDRB
 
-#define LSB_PORT PORTB
-#define MSB_PORT PORTD
-#define BUS_PORT PORTB
+#define MSK_LSB  0b00000011 // data bus bits D0-D1
+#define MSK_MSB  0b11111100 // data bus bits D2-D7
+#define PIN_BC1  PB2        // control bus BC1 pin
+#define PIN_BDIR PB3        // control bus BDIR pin
 
-#define PIN_BC1  PB2
-#define PIN_BDIR PB3
+// writes to data bus
+#define dbus_set(data) { LSB_PORT |=  ((data) & MSK_LSB); MSB_PORT |=  ((data) & MSK_MSB); }
+#define dbus_clr(data) { LSB_PORT &= ~((data) & MSK_LSB); MSB_PORT &= ~((data) & MSK_MSB); }
 
-#define SET_DATA(data) { LSB_PORT |=  ((data) & 0b00000011); MSB_PORT |=  ((data) & 0b11111100); }
-#define CLR_DATA(data) { LSB_PORT &= ~((data) & 0b00000011); MSB_PORT &= ~((data) & 0b11111100); }
+// writes to control bus
+#define cbus_set(pin)  { BUS_PORT |=  (1 << (pin)); }
+#define cbus_clr(pin)  { BUS_PORT &= ~(1 << (pin)); }
 
-void send_to_psg(byte address, byte data)
+byte serial_read()
+{
+    while (!Serial.available()) _delay_us(1);
+    return Serial.read();
+}
+
+void send_to_psg(byte reg, byte data)
 {
     // WRITE REGISTER NUMBER
-    SET_DATA(address);            // write address to pins
-    bitSet(BUS_PORT, PIN_BDIR);   // set BC1+BDIR pins, latch address mode
-    bitSet(BUS_PORT, PIN_BC1);
-    _delay_us(0.500);             // set+hold address delay 500ns (400+100 min)
-    bitClear(BUS_PORT, PIN_BDIR); // clear BC1+BDIR pins, inactive mode
-    bitClear(BUS_PORT, PIN_BC1);
-    CLR_DATA(address);            // reset pins to tristate mode
+    dbus_set(reg);      // write address to pins
+    cbus_set(PIN_BDIR); // set BC1+BDIR pins, latch address mode
+    cbus_set(PIN_BC1);
+    _delay_us(0.500);   // set+hold address delay 500ns (400+100 min)
+    cbus_clr(PIN_BDIR); // clear BC1+BDIR pins, inactive mode
+    cbus_clr(PIN_BC1);
+    dbus_clr(reg);      // reset pins to tristate mode
 
     // WRITE REGISTER DATA
-    SET_DATA(data);               // write data to pins
-    bitSet(BUS_PORT, PIN_BDIR);   // set BDIR pin, write to reg mode
-    _delay_us(0.250);             // 250ns delay (250min-500max)
-    bitClear(BUS_PORT, PIN_BDIR); // clear BDIR pin, inactive mode
-    CLR_DATA(data);               // reset pins to tristate mode
+    dbus_set(data);     // write data to pins
+    cbus_set(PIN_BDIR); // set BDIR pin, write to reg mode
+    _delay_us(0.250);   // 250ns delay (250min-500max)
+    cbus_clr(PIN_BDIR); // clear BDIR pin, inactive mode
+    dbus_clr(data);     // reset pins to tristate mode
 }
 
 void setup()
 {
-    // init pins
-    LSB_DDR |= 0b00000011;
-    MSB_DDR |= 0b11111100;
-    bitSet(BUS_DDR, PIN_BDIR);
-    bitSet(BUS_DDR, PIN_BC1);
+    // init pins for output
+    LSB_DDR |= MSK_LSB;
+    MSB_DDR |= MSK_MSB;
+    BUS_DDR |= (1 << PIN_BDIR);
+    BUS_DDR |= (1 << PIN_BC1);
 
     // inactive mode
-    bitClear(BUS_PORT, PIN_BDIR);
-    bitClear(BUS_PORT, PIN_BC1);
+    cbus_clr(PIN_BDIR);
+    cbus_clr(PIN_BC1);
 
     // serial init
     Serial.begin(57600);
@@ -81,13 +93,11 @@ void loop()
     while (true)
     {
         // wait for register number
-        while (!Serial.available()) delayMicroseconds(1);
-        byte reg = Serial.read();
-        if (reg > 15) continue;
+        byte reg = serial_read();
+        if (reg > 13) continue;
 
         // read data and send everything to PSG
-        while (!Serial.available()) delayMicroseconds(1);
-        byte data = Serial.read();
+        byte data = serial_read();
         send_to_psg(reg, data);
     }
 }
