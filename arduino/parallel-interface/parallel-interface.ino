@@ -1,24 +1,20 @@
 #include <util/delay.h>
 
-#define LSB_PORT PORTB      // data bus bits D0-D1
-#define LSB_DDR  DDRB
-#define MSB_PORT PORTD      // data bus bits D2-D7
+// data bus bits D0-D3 (Arduino pins A0-A3)
+#define LSB_PORT PORTC
+#define LSB_DDR  DDRC
+#define LSB_MASK 0b00001111
+
+// data bus bits D4-D7 (Arduino pins D4-D7)
+#define MSB_PORT PORTD
 #define MSB_DDR  DDRD
-#define BUS_PORT PORTB      // control bus BC1 and BDIR pins
+#define MSB_MASK 0b11110000
+
+// control bus BC1 and BDIR signals
+#define BUS_PORT PORTB
 #define BUS_DDR  DDRB
-
-#define MSK_LSB  0b00000011 // data bus bits D0-D1
-#define MSK_MSB  0b11111100 // data bus bits D2-D7
-#define PIN_BC1  PB2        // control bus BC1 pin
-#define PIN_BDIR PB3        // control bus BDIR pin
-
-// writes to data bus
-#define dbus_set(data) { LSB_PORT |=  ((data) & MSK_LSB); MSB_PORT |=  ((data) & MSK_MSB); }
-#define dbus_clr(data) { LSB_PORT &= ~((data) & MSK_LSB); MSB_PORT &= ~((data) & MSK_MSB); }
-
-// writes to control bus
-#define cbus_set(pin)  { BUS_PORT |=  (1 << (pin)); }
-#define cbus_clr(pin)  { BUS_PORT &= ~(1 << (pin)); }
+#define PIN_BC1  PB0   // Arduino pin D8
+#define PIN_BDIR PB1   // Arduino pin D9
 
 byte serial_read()
 {
@@ -26,36 +22,56 @@ byte serial_read()
     return Serial.read();
 }
 
-void send_to_psg(byte reg, byte data)
+void psg_data(byte data)
 {
-    // WRITE REGISTER NUMBER
-    dbus_set(reg);      // write address to pins
-    cbus_set(PIN_BDIR); // set BC1+BDIR pins, latch address mode
-    cbus_set(PIN_BC1);
-    _delay_us(0.500);   // set+hold address delay 500ns (400+100 min)
-    cbus_clr(PIN_BDIR); // clear BC1+BDIR pins, inactive mode
-    cbus_clr(PIN_BC1);
-    dbus_clr(reg);      // reset pins to tristate mode
+    LSB_PORT = (LSB_PORT & ~LSB_MASK) | (data & LSB_MASK);
+    MSB_PORT = (MSB_PORT & ~MSB_MASK) | (data & MSB_MASK);
+}
 
-    // WRITE REGISTER DATA
-    dbus_set(data);     // write data to pins
-    cbus_set(PIN_BDIR); // set BDIR pin, write to reg mode
-    _delay_us(0.250);   // 250ns delay (250min-500max)
-    cbus_clr(PIN_BDIR); // clear BDIR pin, inactive mode
-    dbus_clr(data);     // reset pins to tristate mode
+void psg_inactive()
+{
+    BUS_PORT &= ~(1 << PIN_BDIR | 1 << PIN_BC1);
+}
+
+void psg_address()
+{
+    BUS_PORT |= (1 << PIN_BDIR | 1 << PIN_BC1);
+    _delay_us(0.300);
+    psg_inactive();
+}
+
+void psg_write()
+{
+    BUS_PORT |= (1 << PIN_BDIR);
+    _delay_us(0.300);
+    psg_inactive();
+}
+
+void psg_send(byte reg, byte data)
+{
+    psg_data(reg);
+    psg_address();
+    psg_data(data);
+    psg_write();
 }
 
 void setup()
 {
+    // 1.77 MHz on pin D3 (PD3)
+    DDRD  |= (1 << PD3);
+    TCCR2A = (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);
+    TCCR2B = (1 << WGM22) | (1 << CS20);
+    OCR2A  = 8;
+    OCR2B  = 3; 
+
     // init pins for output
-    LSB_DDR |= MSK_LSB;
-    MSB_DDR |= MSK_MSB;
+    LSB_DDR |= LSB_MASK;
+    MSB_DDR |= MSB_MASK;
     BUS_DDR |= (1 << PIN_BDIR);
     BUS_DDR |= (1 << PIN_BC1);
 
     // inactive mode
-    cbus_clr(PIN_BDIR);
-    cbus_clr(PIN_BC1);
+    psg_inactive();
 
     // serial init
     Serial.begin(57600);
@@ -71,6 +87,6 @@ void loop()
 
         // read data and send everything to PSG
         byte data = serial_read();
-        send_to_psg(reg, data);
+        psg_send(reg, data);
     }
 }
