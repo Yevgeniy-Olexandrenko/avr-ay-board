@@ -2,7 +2,7 @@
 ; Configuration
 ; ==============================================================================
 #define CHANNELS     3 ; choose 2 or 3 channel version
-#define VOLUME_TABLE 0 ; 0 - AY, 1 - YM, 2 - ALTERNATE volume table
+#define VOLUME_TABLE 0 ; 0 - AY, 1 - YM volume table
 
 ; EEPROM Config:
 ; byte 0 - Serial interface enable (1 - enabled)
@@ -80,26 +80,18 @@
 ; AY_TABLE
 #if VOLUME_TABLE == 0
 Volumes:    ; volume table for amplitude
-    .db     0, 1, 1, 1, 2, 2, 3, 5, 6, 9, 13, 17, 22, 29, 36, 45
+    .db     0*5, 1*5, 1*5, 1*5, 2*5, 2*5, 3*5, 5*5, 6*5, 9*5, 13*5, 17*5, 22*5, 29*5, 36*5, 45*5
 EVolumes:   ; volume table for envelopes
-    .db     0, 0, 1, 1,  1,  1,  1,  1,  2,  2,  2,  2,  3,  3,  5,  5
-    .db     6, 6, 7, 9, 11, 13, 15, 17, 19, 22, 25, 29, 32, 36, 40, 45
+    .db     0*5, 0*5, 1*5, 1*5,  1*5,  1*5,  1*5,  1*5,  2*5,  2*5,  2*5,  2*5,  3*5,  3*5,  5*5,  5*5
+    .db     6*5, 6*5, 7*5, 9*5, 11*5, 13*5, 15*5, 17*5, 19*5, 22*5, 25*5, 29*5, 32*5, 36*5, 40*5, 45*5
 
 ; YM_TABLE
 #elif VOLUME_TABLE == 1
 Volumes:    ; volume table for amplitude
-    .db     0, 1, 1, 1, 2, 2, 3, 4, 5, 7, 10, 13, 18, 24, 34, 45
+    .db     0*5, 1*5, 1*5, 1*5, 2*5, 2*5, 3*5, 4*5, 5*5, 7*5, 10*5, 13*5, 18*5, 24*5, 34*5, 45*5
 EVolumes:   ; volume table for envelopes
-    .db     0, 0, 1, 1, 1,  1,  1,  1,  2,  2,  2,  2,  2,  3,  3,  4
-    .db     4, 5, 6, 7, 8, 10, 11, 13, 15, 18, 21, 24, 29, 34, 40, 45
-
-; ALT_TABLE
-#elif VOLUME_TABLE == 2
-Volumes:    ; volume table for amplitude
-    .db     0, 1, 2, 3, 4, 5, 6, 7, 9, 11, 13, 16, 22, 31, 42, 58
-EVolumes:   ; volume table for envelopes
-    .db     0,   1,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14
-    .db     15, 16, 17, 18, 20, 22, 24, 26, 28, 30, 33, 36, 40, 45, 51, 58
+    .db     0*5, 0*5, 1*5, 1*5, 1*5,  1*5,  1*5,  1*5,  2*5,  2*5,  2*5,  2*5,  2*5,  3*5,  3*5,  4*5
+    .db     4*5, 5*5, 6*5, 7*5, 8*5, 10*5, 11*5, 13*5, 15*5, 18*5, 21*5, 24*5, 29*5, 34*5, 40*5, 45*5
 #endif
 
 ; envelope codes:
