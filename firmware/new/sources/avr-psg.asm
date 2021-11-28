@@ -1,7 +1,7 @@
 ; ==============================================================================
 ; Configuration
 ; ==============================================================================
-#define CHANNELS     2 ; choose 2 or 3 channel version
+#define CHANNELS     3 ; choose 2 or 3 channel version
 #define VOLUME_TABLE 0 ; 0 - AY, 1 - YM, 2 - ALTERNATE volume table
 
 ; EEPROM Config:
@@ -337,6 +337,20 @@ L0:
 NO_USART:
 
     ; --------------------------------------------------------------------------
+    ; Init Timer0
+    ; --------------------------------------------------------------------------
+
+    ; Fast PWM, TOP = OCR0A
+    ldi     r16, (1 << WGM01) | (1 << WGM00)
+    out     TCCR0A, r16
+    ldi     r16, (1 << WGM02) | (1 << CS00);
+    out     TCCR0B, r16
+
+    ; 219512 Hz internal update clock
+    ldi     r16, (27000000 / (1750000 / 8) - 1)
+    out     OCR0A, r16
+
+    ; --------------------------------------------------------------------------
     ; Init Timer1
     ; --------------------------------------------------------------------------
     sts     OCR1AH, C00             ; clear OCR values
@@ -419,10 +433,10 @@ NO_EXT_INT:
 ; Main Loop
 ; ==============================================================================
 MAIN_LOOP:
-    in		YL,TIFR1		; check timer1 overflow flag TOV1
-    sbrs	YL,TOV1
+    in		YL,TIFR0		; check timer0 overflow flag TOV0
+    sbrs	YL,TOV0
     rjmp	MAIN_LOOP		; jump if not set
-    out		TIFR1,YL		; clear timer overflow flag
+    out		TIFR0,YL		; clear timer overflow flag
 
     // sound generation code start (using timer1 overflow flag)
     // MIN cycles: 69
