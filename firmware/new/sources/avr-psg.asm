@@ -347,37 +347,30 @@ NO_USART:
     out     TCCR0B, r16
 
     ; 219512 Hz internal update clock
-    ldi     r16, (27000000 / (1750000 / 8) - 1)
-    out     OCR0A, r16
+    ;ldi     r16, (27000000 / (1750000 / 8) - 1)
+    ;out     OCR0A, r16
+    out     EEARL, YH               ; set EEPROM address 2
+    sbi     EECR, b0
+    in      r18, EEDR               ; load byte 2 from EEPROM to r18
+    out     OCR0A, r18              ; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
 
     ; --------------------------------------------------------------------------
     ; Init Timer1
     ; --------------------------------------------------------------------------
-    sts     OCR1AH, C00             ; clear OCR values
-    sts     OCR1AL, C00
-    sts     OCR1BH, C00
-    sts     OCR1BL, C00
+    ;sts     OCR1AH, C00             ; clear OCR values
+    ;sts     OCR1AL, C00
+    ;sts     OCR1BH, C00
+    ;sts     OCR1BL, C00
     sbi     DDRB, DDB1                ; set port B pin 1 to output for PWM (AY channel A)
     sbi     DDRB, DDB2                ; set port B pin 2 to output for PWM (AY channel C)
 
-    ; Waveform generation mode: 14 (Fast PWM, TOP controlled by ICR1)
+    ; Waveform generation mode: 5 (Fast PWM 8-bit, TOP = 0xFF)
     ; Clear OC1A/OC1B on Compare Match, set OC1A/OC1B at BOTTOM (non-inverting mode)
     ; No prescaling
-    ldi     r16, 0xA2               ; COM1A1+COM1B1+WGM11
+    ldi     r16, (1 << WGM10) | (1 << COM1A1) | (1 << COM1B1)
     sts     TCCR1A, r16
-    ldi     r16, 0x19               ; WGM13+WGM12+CS10
+    ldi     r16, (1 << WGM12) | (1 << CS10)
     sts     TCCR1B, r16
-
-    ; Defines the counter's TOP value
-    ; ICR1H = 0
-    ; ICR1L = config
-    out     EEARL, YH               ; set EEPROM address 2
-    sbi     EECR, b0
-    in      r18, EEDR               ; load byte 2 from EEPROM to r18
-    sts     ICR1H, C00
-    sts     ICR1L, r18              ; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
-    ; ICR1L value formula (28000000/109375/2 - 1) where 28000000 = 28MHz - AVR oscillator frequency
-    ; 109375 is for 1.75 MHz version, formula is (PSG frequency / 16) e.g. for 2MHz it is 2000000/16 = 125000
 
     ; --------------------------------------------------------------------------
     ; Init Timer2
