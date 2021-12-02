@@ -3,7 +3,6 @@
 ; ==============================================================================
 ; Configuration
 ; ==============================================================================
-#define VOLUME_TABLE 0 ; 0 - AY, 1 - YM volume table
 
 ; EEPROM Config:
 ; byte 0 - Serial interface enable (1 - enabled)
