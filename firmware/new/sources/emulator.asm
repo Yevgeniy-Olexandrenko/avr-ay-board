@@ -38,9 +38,9 @@
     .def C04        = r10   ; Constant 0x04
     .def TMP        = r11
     .def BusData    = r12   ; IO 8-bit bus data
-    .def SREGSave   = r13
-    .def RNGL       = r14
-    .def RNGH       = r15
+    .def SREGSave   = r13   ; Save SREG
+    .def RNGL       = r14   ; Random Number Generator (low part)
+    .def RNGH       = r15   ; Random Number Generator (high part)
     .def TabE       = r16
     .def EVal       = r17   ; Envelope output volume
     .def TabP       = r18   ; Envelope period counter (32 steps)
@@ -143,8 +143,8 @@ ISR_INT0:                           ; [4] enter interrupt
     ; 8 * 40ns = 320ns for 25MHz O.K.
     ; 8 * 42ns = 336ns for 24MHz O.K.
     ; 8 * 50ns = 400ns for 20MHz !!!!
-    out     DDRD, BusOut2           ; [1] turn pins to output
-    out     DDRC, BusOut1           ; [1]
+    OutReg  DDRD, BusOut2           ; [1] turn pins to output
+    OutReg  DDRC, BusOut1           ; [1]
 
 LOOP_NOT_INACTIVE:                  ; loop while BC1=1
     ; 400ns max for release data bus, 9 cycles min
@@ -154,21 +154,21 @@ LOOP_NOT_INACTIVE:                  ; loop while BC1=1
     ; 9 * 37 = 333ns for 27MHz O.K.
     sbic    PinD, b2                ; [2/1] check BC1 bit, skip next if clear
     rjmp    LOOP_NOT_INACTIVE       ; [0/2]
-    out     DDRC, C00               ; [1] turn pins to input
-    out     DDRD, C00               ; [1]
+    OutReg  DDRC, C00               ; [1] turn pins to input
+    OutReg  DDRD, C00               ; [1]
     reti                            ; [4] leave interrupt
 
 LATCH_REG_ADDR0:                    ; TODO: use common latch reg mode code
     ; [ LATCH ADDRESS MODE ] (BC1=1, BDIR=1)
     ; --------------------------------------------------------------------------
-    in      ADDR, PinC              ; [ ] receive register number
+    InReg   ADDR, PinC              ; [ ] receive register number
     ldd     BusOut1, Z+0x20         ; [ ] load value from SRAM
     ldd     BusOut2, Z+0x30         ; [ ] load value from SRAM
-    out     EIFR, YH                ; [ ] reset ext. interrupt flags
+    OutReg  EIFR, YH                ; [ ] reset ext. interrupt flags (TODO: may be not needed inside interrupt)
     reti                            ; [4] leave interrupt
 
 ISR_INT1:                           ; [4] enter interrupt
-    in      BusData, PinC           ; [ ] TODO: move to write reg mode
+    InReg   BusData, PinC           ; [ ] TODO: move to write reg mode
     sbic    PinD, b2                ; [2/1] check BC1 bit, skip next if clear
     rjmp    LATCH_REG_ADDR1         ; [0/2]
 
@@ -179,8 +179,8 @@ ISR_INT1:                           ; [4] enter interrupt
     ; 33 * 42 = 1386ns for 24MHz O.K.
     ; 33 * 40 = 1320ns for 25MHz O.K.
     ; 33 * 37 = 1221ns for 27MHz O.K.
-    in      BusOut1, PinD           ; [1]
-    in      SREGSave, SREG          ; [1] save SREG
+    InReg   BusOut1, PinD           ; [1]
+    InReg   SREGSave, SREG          ; [1] save SREG
     and     BusOut1, CC0            ; [1]
     or      BusData, BusOut1        ; [1] construct register value from 2 ports
     mov     BusOut1, BusData        ; [1]
@@ -199,7 +199,7 @@ ISR_INT1:                           ; [4] enter interrupt
     ori     TNLevel, 0x80           ; [1] set flag that register 13 changed
 
 NO_ENVELOPE_CHANGED_P:
-    out     SREG, SREGSave          ; [1]
+    OutReg  SREG, SREGSave          ; [1]
     reti                            ; [4] leave interrupt
 
 LATCH_REG_ADDR1:                    ; TODO: use common latch reg mode code
@@ -213,14 +213,14 @@ LATCH_REG_ADDR1:                    ; TODO: use common latch reg mode code
     mov     ADDR, BusData           ; [ ] receive register number
     ldd     BusOut1, Z+0x20         ; [2] load value from SRAM
     ldd     BusOut2, Z+0x30         ; [2] load value from SRAM
-    out     EIFR, YH                ; [ ] reset ext. interrupt flags
+    OutReg  EIFR, YH                ; [ ] reset ext. interrupt flags (TODO: may be not needed inside interrupt)
     reti                            ; [4] leave interrupt
 
 ; ==============================================================================
 ; Serial communication mode: URXC Handler
 ; ==============================================================================
 ISR_USART_RX:
-    lds     BusData, UDR0           ; get byte from USART
+    InReg   BusData, UDR0           ; get byte from USART
     sbrs    ADDR, b4                ; check for address/data mode
     rjmp    RECV_REG_VALUE
     sbrc    BusData, b7
@@ -233,7 +233,7 @@ USART_SYNC:                         ; <= synchronization mode
     reti
 
 RECV_REG_VALUE:                     ; <= receive register value
-    in      SREGSave, SREG
+    InReg   SREGSave, SREG
     ld      BusOut1, Z              ; load register mask
     and     BusData, BusOut1        ; apply register mask
     std     Z+0x10, BusData         ; put register value to SRAM
@@ -243,27 +243,27 @@ RECV_REG_VALUE:                     ; <= receive register value
 
 NO_ENVELOPE_CHANGED_S:
     ldi     ADDR, 0x10              ; set bit 4 to jump to receive register number on next byte received
-    out     SREG, SREGSave
+    OutReg  SREG, SREGSave
     reti
 
 ; ==============================================================================
 ; Entry point
 ; ==============================================================================
 RESET:
-    in      r16, MCUCR              ; 1-> PUD for Atmega48/88/168/328
+    InReg   r16, MCUCR              ; 1-> PUD for Atmega48/88/168/328
     sbr     r16, PUD
-    out     MCUCR, r16
+    OutReg  MCUCR, r16
 
     ; init stack pointer at end of RAM
     ldi     r16, low(RAMEND)
-    out     SPL, r16
+    OutReg  SPL, r16
     ldi     r16, high(RAMEND)
-    out     SPH, r16
+    OutReg  SPH, r16
 
     ; disable Analog Comparator
-    in      r16, ACSR               ; for ATMEGA48/88/168/328
+    InReg   r16, ACSR               ; for ATMEGA48/88/168/328
     sbr     r16, ACD
-    out     ACSR, r16
+    OutReg  ACSR, r16
 
     ; init constants
     clr     C00
@@ -320,16 +320,15 @@ L0:
     ldi     r18, 0x10
     rcall   _COPY
 
-
     ldi     ZH, 0x01                ; set high byte of register Z for fast acces to register values
     ldi     YH, 0x02                ; set high byte of register Y for fast acces to volume table
     mov     NoiseAddon, ZH          ; load default value = 1 to high bit of noise generator
 
     ; get byte 0 from EEPROM, check value > 0 or skip USART initialization if value = 0
-    out     EEARH, C00              ; is absent in Atmega48
-    out     EEARL, C00
+    OutReg  EEARH, C00              ; is absent in Atmega48
+    OutReg  EEARL, C00
     sbi     EECR, b0
-    in      r16, EEDR
+    InReg   r16, EEDR
     cp      r16, C00
     breq    NO_USART
 
@@ -337,18 +336,19 @@ L0:
     ; Init USART
     ; --------------------------------------------------------------------------
     clr     r16
-    sts     UBRR0H, r16
+    OutReg  UBRR0H, r16
     ldi     r16, 0x06
-    sts     UCSR0C, r16
+    OutReg  UCSR0C, r16
     ldi     r16, 0x02
-    sts     UCSR0A, r16
+    OutReg  UCSR0A, r16
     ldi     r16, 0x90
-    sts     UCSR0B, r16
+    OutReg  UCSR0B, r16
+
     ldi     r16, 0x03
-    out     EEARL, r16
+    OutReg  EEARL, r16
     sbi     EECR, b0
-    in      r18, EEDR
-    sts     UBRR0L, r18
+    InReg   r18, EEDR
+    OutReg  UBRR0L, r18
 NO_USART:
 
     ; --------------------------------------------------------------------------
@@ -357,17 +357,17 @@ NO_USART:
 
     ; Fast PWM, TOP = OCR0A
     ldi     r16, (1 << WGM01) | (1 << WGM00)
-    out     TCCR0A, r16
+    OutReg  TCCR0A, r16
     ldi     r16, (1 << WGM02) | (1 << CS00);
-    out     TCCR0B, r16
+    OutReg  TCCR0B, r16
 
     ; 219512 Hz internal update clock
     ;ldi     r16, (27000000 / (1750000 / 8) - 1)
     ;out     OCR0A, r16
-    out     EEARL, YH               ; set EEPROM address 2
+    OutReg  EEARL, YH               ; set EEPROM address 2
     sbi     EECR, b0
-    in      r18, EEDR               ; load byte 2 from EEPROM to r18
-    out     OCR0A, r18              ; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
+    InReg   r18, EEDR               ; load byte 2 from EEPROM to r18
+    OutReg  OCR0A, r18              ; set PWM speed from byte 2 of EEPROM (affect AY chip frequency)
 
     ; --------------------------------------------------------------------------
     ; Init Timer1
@@ -376,16 +376,16 @@ NO_USART:
     ;sts     OCR1AL, C00
     ;sts     OCR1BH, C00
     ;sts     OCR1BL, C00
-    sbi     DDRB, DDB1                ; set port B pin 1 to output for PWM (AY channel A)
-    sbi     DDRB, DDB2                ; set port B pin 2 to output for PWM (AY channel C)
+    sbi     DDRB, DDB1              ; set port B pin 1 to output for PWM (AY channel A)
+    sbi     DDRB, DDB2              ; set port B pin 2 to output for PWM (AY channel C)
 
     ; Waveform generation mode: 5 (Fast PWM 8-bit, TOP = 0xFF)
     ; Clear OC1A/OC1B on Compare Match, set OC1A/OC1B at BOTTOM (non-inverting mode)
     ; No prescaling
     ldi     r16, (1 << WGM10) | (1 << COM1A1) | (1 << COM1B1)
-    sts     TCCR1A, r16
+    OutReg  TCCR1A, r16
     ldi     r16, (1 << WGM12) | (1 << CS10)
-    sts     TCCR1B, r16
+    OutReg  TCCR1B, r16
 
     ; --------------------------------------------------------------------------
     ; Init Timer2
@@ -396,14 +396,14 @@ NO_USART:
     ; Clear OC2 on Compare Match, set OC2 at BOTTOM (non-inverting mode)
     ; No prescaling
     ldi     r16, 0x83               ; COM2A1+WGM21+WGM20
-    sts     TCCR2A, r16
+    OutReg  TCCR2A, r16
     ldi     r16, 0x01               ; CS20
-    sts     TCCR2B, r16
+    OutReg  TCCR2B, r16
 
     ; check for parallel interface enabled in byte 1 of EEPROM
-    out     EEARL, ZH
+    OutReg  EEARL, ZH
     sbi     EECR, b0
-    in      r16, EEDR
+    InReg   r16, EEDR
     cp      r16, C00
     breq    NO_EXT_INT
 
@@ -411,10 +411,10 @@ NO_USART:
     ; Init external interrupts INT0 and INT1
     ; --------------------------------------------------------------------------
     ldi     r16, 0x0F               ; fallen edge of INT0, INT1
-    sts     EICRA, r16
+    OutReg  EICRA, r16
     ldi     r16, 0x03
-    out     EIFR, r16
-    out     EIMSK, r16
+    OutReg  EIFR, r16
+    OutReg  EIMSK, r16
 NO_EXT_INT:
 
     ; init constants and variables second part
@@ -439,10 +439,10 @@ NO_EXT_INT:
 ; Main Loop
 ; ==============================================================================
 MAIN_LOOP:
-    in      YL, TIFR0               ; check timer0 overflow flag TOV0
+    InReg   YL, TIFR0               ; check timer0 overflow flag TOV0
     sbrs    YL, TOV0
     rjmp    MAIN_LOOP               ; jump if not set
-    out     TIFR0, YL               ; clear timer overflow flag
+    OutReg  TIFR0, YL               ; clear timer overflow flag
 
     ; --------------------------------------------------------------------------
     ; ENVELOPE GENERATOR
@@ -490,8 +490,6 @@ ENVELOPE_GENERATOR_END:
     ; --------------------------------------------------------------------------
     dec     CntN                    ; decrease noise period counter
     brpl    NOISE_GENERATOR_END     ; skip if noise period is not finished (CntN>=0)
-
-    ; init new cycle
     lds     CntN, AY_REG06          ; init noise period counter with value in AY register 6
     dec     CntN
 
@@ -585,19 +583,19 @@ CH_C_NO_CHANGE:
     clr     OutC
 
     ; update PWM counters
-    sts     OCR2A, OutB
-    sts     OCR1AL, OutA
-    sts     OCR1BL, OutC
+    OutReg  OCR1AL, OutA
+    OutReg  OCR2A,  OutB
+    OutReg  OCR1BL, OutC
     rjmp    MAIN_LOOP
 
 ; ==============================================================================
 ; Subroutines
 ; ==============================================================================
-_COPY:                      ; copy from flash to SRAM
+COPY:                       ; copy from flash to SRAM
     lpm     r16, Z+
     st      X+, r16
     dec     r18
-    brne    _COPY
+    brne    COPY
     ret
 
     ; data segment starts here
