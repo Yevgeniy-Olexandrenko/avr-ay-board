@@ -1,3 +1,5 @@
+.include "macrodefs.inc"
+
 ; ==============================================================================
 ; Configuration
 ; ==============================================================================
@@ -92,19 +94,27 @@
 
 ; AY_TABLE
 #if VOLUME_TABLE == 0
-Volumes:    ; volume table for amplitude
-    .db     0*5, 1*5, 1*5, 1*5, 2*5, 2*5, 3*5, 5*5, 6*5, 9*5, 13*5, 17*5, 22*5, 29*5, 36*5, 45*5
+TVolumes:   ; volume table for amplitude
+    .db     0x00, 0x03, 0x04, 0x05, 0x08, 0x0C, 0x10, 0x1B
+    .db     0x20, 0x34, 0x4B, 0x5F, 0x7E, 0xA2, 0xCD, 0xFF
+
 EVolumes:   ; volume table for envelopes
-    .db     0*5, 0*5, 1*5, 1*5,  1*5,  1*5,  1*5,  1*5,  2*5,  2*5,  2*5,  2*5,  3*5,  3*5,  5*5,  5*5
-    .db     6*5, 6*5, 7*5, 9*5, 11*5, 13*5, 15*5, 17*5, 19*5, 22*5, 25*5, 29*5, 32*5, 36*5, 40*5, 45*5
+    .db     0x00, 0x00, 0x03, 0x03, 0x04, 0x04, 0x05, 0x05
+    .db     0x08, 0x08, 0x0C, 0x0C, 0x10, 0x10, 0x1B, 0x1B
+    .db     0x20, 0x20, 0x34, 0x34, 0x4B, 0x4B, 0x5F, 0x5F
+    .db     0x7E, 0x7E, 0xA2, 0xA2, 0xCD, 0xCD, 0xFF, 0xFF
 
 ; YM_TABLE
 #elif VOLUME_TABLE == 1
-Volumes:    ; volume table for amplitude
-    .db     0*5, 1*5, 1*5, 1*5, 2*5, 2*5, 3*5, 4*5, 5*5, 7*5, 10*5, 13*5, 18*5, 24*5, 34*5, 45*5
+TVolumes:   ; volume table for amplitude
+    .db     0x00, 0x02, 0x04, 0x05, 0x08, 0x0A, 0x0F, 0x14
+    .db     0x1C, 0x26, 0x36, 0x48, 0x66, 0x88, 0xC1, 0xFF
+
 EVolumes:   ; volume table for envelopes
-    .db     0*5, 0*5, 1*5, 1*5, 1*5,  1*5,  1*5,  1*5,  2*5,  2*5,  2*5,  2*5,  2*5,  3*5,  3*5,  4*5
-    .db     4*5, 5*5, 6*5, 7*5, 8*5, 10*5, 11*5, 13*5, 15*5, 18*5, 21*5, 24*5, 29*5, 34*5, 40*5, 45*5
+    .db     0x00, 0x00, 0x01, 0x02, 0x03, 0x04, 0x04, 0x05
+    .db     0x06, 0x08, 0x09, 0x0A, 0x0C, 0x0F, 0x11, 0x14
+    .db     0x18, 0x1C, 0x21, 0x26, 0x2D, 0x36, 0x3F, 0x48
+    .db     0x55, 0x66, 0x77, 0x88, 0xA2, 0xC1, 0xE0, 0xFF
 #endif
 
 ; envelope codes:
@@ -112,7 +122,8 @@ EVolumes:   ; volume table for envelopes
 ;   bit1 - invert on next cycle,
 ;   bit2 - stop generator on next cycle
 Envelopes:
-    .db     7, 7, 7, 7, 4, 4, 4, 4, 1, 7, 3, 5, 0, 6, 2, 4
+    .db     0x07, 0x07, 0x07, 0x07, 0x04, 0x04, 0x04, 0x04
+    .db     0x01, 0x07, 0x03, 0x05, 0x00, 0x06, 0x02, 0x04
 
 ; mask applied to registers values after receiving
 RegsMask:
@@ -290,8 +301,8 @@ L0:
 
     ; load volume table for amplitude to SRAM 0x220, 16 bytes
     ldi     xl, 0x20
-    ldi     zl, low(2*Volumes)
-    ldi     zh, high(2*Volumes)
+    ldi     zl, low(2*TVolumes)
+    ldi     zh, high(2*TVolumes)
     ldi     r18, 0x10
     rcall   _COPY
 
@@ -567,11 +578,11 @@ CH_C_NO_CHANGE:
     clr     OutB
 
     ; Channel C
-    lds     YL, AY_REG10		; Load Channel C Amplitude register
-    mov     OutC, EVal		; set envelope volume as default value
-    sbrs    YL, b4			; if bit 4 is not set in amplitude register then translate it to volume
-    ldd     OutC, Y+0x20		; load volume value from SRAM 0x220 + YL
-    sbrs    TMP, b2			; if channel is disabled in mixer - set volume to zero
+    lds     YL, AY_REG10            ; Load Channel C Amplitude register
+    mov     OutC, EVal              ; set envelope volume as default value
+    sbrs    YL, b4                  ; if bit 4 is not set in amplitude register then translate it to volume
+    ldd     OutC, Y+0x20            ; load volume value from SRAM 0x220 + YL
+    sbrs    TMP, b2                 ; if channel is disabled in mixer - set volume to zero
     clr     OutC
 
     ; update PWM counters
