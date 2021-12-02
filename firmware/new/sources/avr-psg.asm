@@ -1,7 +1,6 @@
 ; ==============================================================================
 ; Configuration
 ; ==============================================================================
-#define CHANNELS     3 ; choose 2 or 3 channel version
 #define VOLUME_TABLE 0 ; 0 - AY, 1 - YM volume table
 
 ; EEPROM Config:
@@ -25,35 +24,49 @@
     .equ b7 = 0x07
 
     ; register variables:
-    .def OutA       = r0
-    .def OutC       = r1
-    .def C1F        = r2
-    .def CntN       = r3
-    .def OutB       = r4
+    .def OutA       = r0    ; Channel A output volume
+    .def OutC       = r1    ; Channel C output volume
+    .def C1F        = r2    ; Constant 0x1F
+    .def CntN       = r3    ; Noise counter
+    .def OutB       = r4    ; Channel B output volume
     .def BusOut1    = r5
     .def NoiseAddon = r6
-    .def C00        = r7
-    .def CC0        = r8
+    .def C00        = r7    ; Constant 0x00
+    .def CC0        = r8    ; Constant 0xC0
     .def BusOut2    = r9
-    .def C04        = r10
+    .def C04        = r10   ; Constant 0x04
     .def TMP        = r11
-    .def BusData    = r12
+    .def BusData    = r12   ; IO 8-bit bus data
     .def SREGSave   = r13
     .def RNGL       = r14
     .def RNGH       = r15
     .def TabE       = r16
-    .def EVal       = r17
-    .def TabP       = r18
+    .def EVal       = r17   ; Envelope output volume
+    .def TabP       = r18   ; Envelope period counter (32 steps)
     .def TNLevel    = r19
-    .def CntAL      = r20
-    .def CntAH      = r21
-    .def CntBL      = r22
-    .def CntBH      = r23
-    .def CntCL      = r24
-    .def CntCH      = r25
-    .def CntEL      = r26
-    .def CntEH      = r27
-    .def ADDR       = r30
+    .def CntAL      = r20   ; Tone A counter (low part)
+    .def CntAH      = r21   ; Tone A counter (high part)
+    .def CntBL      = r22   ; Tone B counter (low part)
+    .def CntBH      = r23   ; Tone B counter (high part)
+    .def CntCL      = r24   ; Tone C counter (low part)
+    .def CntCH      = r25   ; Tone C counter (high part)
+    .def CntEL      = r26   ; Envelope counter (low part)
+    .def CntEH      = r27   ; Envelope counter (high part)
+    .def ADDR       = r30   ; Number of chosen IO register (b0-b3) and flag
+                            ; for set up register number/value (b4)
+
+    ; comments on registers:
+    ; YH <- 0x02 - high byte of register Y used for fast acces to volume table
+    ; ZH <- 0x01 - high byte of register Z used for fast acces to register values
+
+    ; SRAM zones:
+    ; 0x0100 - 0x010F - register masks
+    ; 0x0110 - 0x011F - current registers values
+    ; 0x0120 - 0x012F - inverted low bits of register values (b0-b5)
+    ; 0x0130 - 0x013F - inverted high bits of register values (b6-b7)
+    ; 0x0210 - 0x021F - envelope codes
+    ; 0x0220 - 0x022F - volume table for tone/noise amplitude
+    ; 0x0230 - 0x024F - volume table for envelope amplitude
 
     ; code section starts here
     .cseg
@@ -162,7 +175,7 @@ ISR_INT1:                           ; [4] enter interrupt
     or      BusData, BusOut1        ; [1] construct register value from 2 ports
     mov     BusOut1, BusData        ; [1]
     com     BusOut1                 ; [1] invert register value
-    std     Z+0x20, BusOut1         ; [2] put inverted register value to SRAM for read mode
+    std     Z+0x20, BusOut1         ; [2] put inverted register value to SRAM for read mode (6 low bits)
 
     ld      BusOut2, Z              ; [2] load register mask from SRAM
     and     BusData, BusOut2        ; [1] apply register mask
@@ -367,7 +380,6 @@ NO_USART:
     ; --------------------------------------------------------------------------
     ; Init Timer2
     ; --------------------------------------------------------------------------
-#if CHANNELS == 3
     sbi     DDRB, DDB3              ; set port B pin 3 to output for PWM (AY channel C)
 
     ; Waveform Generation Mode: 3 (Fast PWM, TOP = 0xFF)
@@ -377,7 +389,6 @@ NO_USART:
     sts     TCCR2A, r16
     ldi     r16, 0x01               ; CS20
     sts     TCCR2B, r16
-#endif
 
     ; check for parallel interface enabled in byte 1 of EEPROM
     out     EEARL, ZH
@@ -418,186 +429,156 @@ NO_EXT_INT:
 ; Main Loop
 ; ==============================================================================
 MAIN_LOOP:
-    in		YL,TIFR0		; check timer0 overflow flag TOV0
-    sbrs	YL,TOV0
-    rjmp	MAIN_LOOP		; jump if not set
-    out		TIFR0,YL		; clear timer overflow flag
+    in      YL, TIFR0               ; check timer0 overflow flag TOV0
+    sbrs    YL, TOV0
+    rjmp    MAIN_LOOP               ; jump if not set
+    out     TIFR0, YL               ; clear timer overflow flag
 
-    // sound generation code start (using timer1 overflow flag)
-    // MIN cycles: 69
-    // MAX cycles: 110
+    ; --------------------------------------------------------------------------
+    ; ENVELOPE GENERATOR
+    ; --------------------------------------------------------------------------
+    sbrs    TNLevel, b7
+    rjmp    NO_ENVELOPE_CHANGED
 
-    /////////////////////////////////////////////////////////////////////////////////////
-    /// ENVELOPE GENERATOR
-    /////////////////////////////////////////////////////////////////////////////////////
-    sbrs	TNLevel,b7
-    rjmp	NO_ENVELOPE_CHANGED
-
-    // initialize envelope generator after change envelope shape register, only first 1/32 part of the first period!
-    lds		YL,AY_REG13		; load envelope shape register value to TabE
-    ldd		TabE,Y+0x10		; get envelope code from SRAM
-    ldi		TabP,0x1F		; set counter for envelope period
-    andi	TNLevel,0x7F	; clear envelope shape change flag
-    rjmp	E_NEXT_STEP
+    ; initialize envelope generator after change envelope shape register,
+    ; only first 1/32 part of the first period!
+    lds     YL, AY_REG13            ; load envelope shape register value to TabE
+    ldd     TabE, Y+0x10            ; get envelope code from SRAM
+    ldi     TabP, 0x1F              ; set counter for envelope period
+    andi    TNLevel, 0x7F           ; clear envelope shape change flag
+    rjmp    E_NEXT_STEP
 
 NO_ENVELOPE_CHANGED:
-    sbrc	TabE,b7			; alternate: cpi	TabE,0x80	; check if envelope generator is disabled
-    rjmp	ENVELOPE_GENERATOR_END	; alternate: brcc	ENVELOPE_GENERATOR_END
-    sbiw	CntEL,0x01
-    brcs	E_NEXT_PERIOD	; jump to init next envelope value if counter overflow (if initial value was 0)
-    brne	ENVELOPE_GENERATOR_END	; go to the next step if zero value is not reached
+    sbrc    TabE, b7                ; check if envelope generator is disabled
+    rjmp    ENVELOPE_GENERATOR_END
+    sbiw    CntEL, 0x01
+    brcs    E_NEXT_PERIOD           ; jump to init next envelope value if counter overflow (if initial value was 0)
+    brne    ENVELOPE_GENERATOR_END  ; go to the next step if zero value is not reached
+
 E_NEXT_PERIOD:
-    dec		TabP
-    brpl	E_NEXT_STEP		; jump to next step if envelope period >= 0
-    ;init new envelope period
-    ldi		TabP,0x1F
-    sbrc	TabE,b1
-    eor		TabE,ZH			; invert envelope ATTACK bit
-    sbrc	TabE,b2
-    or		TabE,CC0		; disable envelope generator until new envelope shape register recived
+    dec     TabP
+    brpl    E_NEXT_STEP             ; jump to next step if envelope period >= 0
+
+    ; init new envelope period
+    ldi     TabP, 0x1F
+    sbrc    TabE, b1
+    eor     TabE, ZH                ; invert envelope ATTACK bit
+    sbrc    TabE, b2
+    or      TabE, CC0               ; disable envelope generator until new envelope shape register recived
+
 E_NEXT_STEP:
-    lds		CntEL,AY_REG11
-    lds		CntEH,AY_REG12
-    mov		YL,TabP
-    sbrs	TabE,b0
-    eor		YL,C1F			; invert envelope value if ATTACK bit is not set
-    ldd		EVal,Y+0x30		; translate envelope value to volume, read volume value from SRAM 0x230+YL
+    lds     CntEL, AY_REG11
+    lds     CntEH, AY_REG12
+    mov     YL, TabP
+    sbrs    TabE, b0
+    eor     YL, C1F                 ; invert envelope value if ATTACK bit is not set
+    ldd     EVal, Y+0x30            ; translate envelope value to volume, read volume value from SRAM 0x230+YL
 ENVELOPE_GENERATOR_END:
-    /////////////////////////////////////////////////////////////////////////////////////
 
+    ; --------------------------------------------------------------------------
+    ; NOISE GENERATOR
+    ; --------------------------------------------------------------------------
+    dec     CntN                    ; decrease noise period counter
+    brpl    NOISE_GENERATOR_END     ; skip if noise period is not finished (CntN>=0)
 
-    /////////////////////////////////////////////////////////////////////////////////////
-    /// NOISE GENERATOR
-    /////////////////////////////////////////////////////////////////////////////////////
-    dec		CntN			; decrease noise period counter
-    brpl	NOISE_GENERATOR_END ; skip if noise period is not finished (CntN>=0)
-    //init new cycle
-    lds		CntN,AY_REG06	; init noise period counter with value in AY register 6
-    dec		CntN
+    ; init new cycle
+    lds     CntN,AY_REG06           ; init noise period counter with value in AY register 6
+    dec     CntN
 
-    lsr		NoiseAddon
-    mov		NoiseAddon,RNGL
-    ror		RNGH
-    ror		RNGL
+    lsr     NoiseAddon
+    mov     NoiseAddon, RNGL
+    ror     RNGH
+    ror     RNGL
 
-    ori		TNLevel,0x38	; set noise bits
-    sbrs	RNGL,b0
-    andi	TNLevel,0xC7	; reset noise bits
-    // make input bit
-    lsl		NoiseAddon
-    eor		NoiseAddon,RNGL
-    lsr		NoiseAddon
+    ori     TNLevel, 0x38           ; set noise bits
+    sbrs    RNGL, b0
+    andi    TNLevel, 0xC7           ; reset noise bits
+
+    ; make input bit
+    lsl     NoiseAddon
+    eor     NoiseAddon, RNGL
+    lsr     NoiseAddon
 NOISE_GENERATOR_END:
-    /////////////////////////////////////////////////////////////////////////////////////
 
-
-    /////////////////////////////////////////////////////////////////////////////////////
-    /// TONE GENERATOR
-    /////////////////////////////////////////////////////////////////////////////////////
+    ; --------------------------------------------------------------------------
+    ; TONE GENERATOR
+    ; --------------------------------------------------------------------------
     ; all counters are Int16 values (signed)
-    // Channel A -------------
-    subi	CntAL,0x01		; CntA - 1
-    sbci	CntAH,0x00
-    brpl	CH_A_NO_CHANGE	; CntA >= 0
-    lds		CntAL,AY_REG00	; update channel A tone period counter
-    lds		CntAH,AY_REG01
-    subi	CntAL,0x01		; CntA - 1
-    sbci	CntAH,0x00
-    eor		TNLevel,ZH		; TNLevel xor 1 (change logical level of channel A)
+
+    ; Channel A
+    subi    CntAL, 0x01             ; CntA - 1
+    sbci    CntAH, 0x00
+    brpl    CH_A_NO_CHANGE          ; CntA >= 0
+    lds     CntAL, AY_REG00         ; update channel A tone period counter
+    lds     CntAH, AY_REG01
+    subi    CntAL, 0x01             ; CntA - 1
+    sbci    CntAH, 0x00
+    eor     TNLevel, ZH             ; TNLevel xor 1 (change logical level of channel A)
 CH_A_NO_CHANGE:
 
-    // Channel B -------------
-    subi	CntBL,0x01		; CntB - 1
-    sbci	CntBH,0x00
-    brpl	CH_B_NO_CHANGE	; CntB >= 0
-    lds		CntBL,AY_REG02	; update channel B tone period counter
-    lds		CntBH,AY_REG03
-    subi	CntBL,0x01		; CntB - 1
-    sbci	CntBH,0x00
-    eor		TNLevel,YH		; TNLevel xor 2 (change logical level of channel B)
+    ; Channel B
+    subi    CntBL, 0x01             ; CntB - 1
+    sbci    CntBH, 0x00
+    brpl    CH_B_NO_CHANGE          ; CntB >= 0
+    lds     CntBL, AY_REG02         ; update channel B tone period counter
+    lds     CntBH, AY_REG03
+    subi    CntBL, 0x01             ; CntB - 1
+    sbci    CntBH, 0x00
+    eor     TNLevel, YH	            ; TNLevel xor 2 (change logical level of channel B)
 CH_B_NO_CHANGE:
 
-    // Channel C -------------
-    sbiw	CntCL,0x01		; CntC - 1
-    brpl	CH_C_NO_CHANGE	; CntC >= 0
-    lds		CntCL,AY_REG04	; update channel C tone period counter
-    lds		CntCH,AY_REG05
-    sbiw	CntCL,0x01		; CntC - 1
-    eor		TNLevel,C04		; TNLevel xor 4 (change logical level of channel C)
+    ; Channel C
+    sbiw    CntCL, 0x01             ; CntC - 1
+    brpl    CH_C_NO_CHANGE          ; CntC >= 0
+    lds     CntCL, AY_REG04         ; update channel C tone period counter
+    lds     CntCH, AY_REG05
+    sbiw    CntCL, 0x01             ; CntC - 1
+    eor     TNLevel, C04            ; TNLevel xor 4 (change logical level of channel C)
 CH_C_NO_CHANGE:
-    /////////////////////////////////////////////////////////////////////////////////////
 
+    ; --------------------------------------------------------------------------
+    ; MIXER
+    ; --------------------------------------------------------------------------
+    lds     TMP, AY_REG07           ; Load Mixer AY Register from SRAM
+    or      TMP, TNLevel            ; Mixer formula = (Mixer Register Tone | TNLevel Tone) & (Mixer Register Noise | TNLevel Noise)
+    mov     YL, TMP
+    lsl     YL
+    swap    YL
+    and     TMP, YL
 
-    /////////////////////////////////////////////////////////////////////////////////////
-    /// MIXER
-    /////////////////////////////////////////////////////////////////////////////////////
-    lds		TMP,AY_REG07	; Load Mixer AY Register from SRAM
-    or		TMP,TNLevel		; Mixer formula = (Mixer Register Tone | TNLevel Tone) & (Mixer Register Noise | TNLevel Noise)
-    mov		YL,TMP
-    lsl		YL
-    swap	YL
-    and		TMP,YL
-    /////////////////////////////////////////////////////////////////////////////////////
+    ; --------------------------------------------------------------------------
+    ; AMPLITUDE CONTROL
+    ; --------------------------------------------------------------------------
 
-
-    /////////////////////////////////////////////////////////////////////////////////////
-    /// AMPLITUDE CONTROL
-    /////////////////////////////////////////////////////////////////////////////////////
-
-    // Channel A
-    lds		YL,AY_REG08		; Load Channel A Amplitude register
-    mov		OutA,EVal		; set envelope volume as default value
-    sbrs	YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
-    ldd		OutA,Y+0x20		; load volume value from SRAM 0x220 + YL
-    sbrs	TMP,b0			; if channel is disabled in mixer - set volume to zero
-    clr		OutA
+    ; Channel A
+    lds     YL,AY_REG08		; Load Channel A Amplitude register
+    mov     OutA,EVal		; set envelope volume as default value
+    sbrs    YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
+    ldd     OutA,Y+0x20		; load volume value from SRAM 0x220 + YL
+    sbrs    TMP,b0			; if channel is disabled in mixer - set volume to zero
+    clr     OutA
     
-    // Channel B
-    lds		YL,AY_REG09		; Load Channel B Amplitude register
-    mov		OutB,EVal		; set envelope volume as default value
-    sbrs	YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
-    ldd		OutB,Y+0x20		; load volume value from SRAM 0x220 + YL
-    sbrs	TMP,b1			; if channel is disabled in mixer - set volume to zero
-    clr		OutB
+    ; Channel B
+    lds     YL,AY_REG09		; Load Channel B Amplitude register
+    mov     OutB,EVal		; set envelope volume as default value
+    sbrs    YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
+    ldd     OutB,Y+0x20		; load volume value from SRAM 0x220 + YL
+    sbrs    TMP,b1			; if channel is disabled in mixer - set volume to zero
+    clr     OutB
 
-    // Channel C
-    lds		YL,AY_REG10		; Load Channel C Amplitude register
-    mov		OutC,EVal		; set envelope volume as default value
-    sbrs	YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
-    ldd		OutC,Y+0x20		; load volume value from SRAM 0x220 + YL
-    sbrs	TMP,b2			; if channel is disabled in mixer - set volume to zero
-    clr		OutC
+    ; Channel C
+    lds     YL,AY_REG10		; Load Channel C Amplitude register
+    mov     OutC,EVal		; set envelope volume as default value
+    sbrs    YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
+    ldd     OutC,Y+0x20		; load volume value from SRAM 0x220 + YL
+    sbrs    TMP,b2			; if channel is disabled in mixer - set volume to zero
+    clr     OutC
 
-    // Channel B
-#if CHANNELS == 2
-// two channel version ----------------------------------------
-    mov		YL,OutB         ; channel B amplitude lowered to about 63%
-    lsr		OutB			; TMP = TMP - (TMP/4 + TMP/8) eqivalent of
-    lsr		OutB            ; TMP = 0.625 * TMP
-    sub		YL,OutB
-    lsr		OutB
-    sub		YL,OutB
-    add		OutA,YL			; add channel B volume to channels A and C
-    add		OutC,YL
-// --------------------------------------------------------------
-#elif CHANNELS == 3
-// three channel version ----------------------------------------
-    sts	OCR2A,OutB
-// --------------------------------------------------------------
-#endif
-
-// speaker port enabled -----------------------------------------
-    ; TODO: speaker amplitude is about 69% of channel amplitude,
-    ; TODO: probably should be lowered to 63% or lower
-    sbic	PinD,b1			; check PD1 (SPEAKER PORT INPUT) skip if bit is not set
-    add		OutA,C1F		; add some volume to channel A
-    sbic	PinD,b1			; check PD1 (SPEAKER PORT INPUT) skip if bit is not set
-    add		OutC,C1F		; add some volume to channel A
-// --------------------------------------------------------------
-
-    sts		OCR1AL,OutA		; update PWM counters
-    sts		OCR1BL,OutC
-    rjmp	MAIN_LOOP
+    ; update PWM counters
+    sts     OCR2A, OutB
+    sts     OCR1AL, OutA
+    sts     OCR1BL, OutC
+    rjmp    MAIN_LOOP
 
 ; ==============================================================================
 ; Subroutines
