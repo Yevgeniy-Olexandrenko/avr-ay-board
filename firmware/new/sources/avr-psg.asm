@@ -203,7 +203,7 @@ LATCH_REG_ADDR1:                    ; TODO: use common latch reg mode code
     mov     ADDR, BusData           ; [ ] receive register number
     ldd     BusOut1, Z+0x20         ; [2] load value from SRAM
     ldd     BusOut2, Z+0x30         ; [2] load value from SRAM
-	out     EIFR, YH                ; [ ] reset ext. interrupt flags
+    out     EIFR, YH                ; [ ] reset ext. interrupt flags
     reti                            ; [4] leave interrupt
 
 ; ==============================================================================
@@ -482,7 +482,7 @@ ENVELOPE_GENERATOR_END:
     brpl    NOISE_GENERATOR_END     ; skip if noise period is not finished (CntN>=0)
 
     ; init new cycle
-    lds     CntN,AY_REG06           ; init noise period counter with value in AY register 6
+    lds     CntN, AY_REG06          ; init noise period counter with value in AY register 6
     dec     CntN
 
     lsr     NoiseAddon
@@ -551,27 +551,27 @@ CH_C_NO_CHANGE:
     ; --------------------------------------------------------------------------
 
     ; Channel A
-    lds     YL,AY_REG08		; Load Channel A Amplitude register
-    mov     OutA,EVal		; set envelope volume as default value
-    sbrs    YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
-    ldd     OutA,Y+0x20		; load volume value from SRAM 0x220 + YL
-    sbrs    TMP,b0			; if channel is disabled in mixer - set volume to zero
+    lds     YL, AY_REG08            ; Load Channel A Amplitude register
+    mov     OutA, EVal              ; set envelope volume as default value
+    sbrs    YL, b4                  ; if bit 4 is not set in amplitude register then translate it to volume
+    ldd     OutA, Y+0x20            ; load volume value from SRAM 0x220 + YL
+    sbrs    TMP, b0                 ; if channel is disabled in mixer - set volume to zero
     clr     OutA
     
     ; Channel B
-    lds     YL,AY_REG09		; Load Channel B Amplitude register
-    mov     OutB,EVal		; set envelope volume as default value
-    sbrs    YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
-    ldd     OutB,Y+0x20		; load volume value from SRAM 0x220 + YL
-    sbrs    TMP,b1			; if channel is disabled in mixer - set volume to zero
+    lds     YL, AY_REG09            ; Load Channel B Amplitude register
+    mov     OutB, EVal              ; set envelope volume as default value
+    sbrs    YL, b4                  ; if bit 4 is not set in amplitude register then translate it to volume
+    ldd     OutB, Y+0x20            ; load volume value from SRAM 0x220 + YL
+    sbrs    TMP, b1                 ; if channel is disabled in mixer - set volume to zero
     clr     OutB
 
     ; Channel C
-    lds     YL,AY_REG10		; Load Channel C Amplitude register
-    mov     OutC,EVal		; set envelope volume as default value
-    sbrs    YL,b4			; if bit 4 is not set in amplitude register then translate it to volume
-    ldd     OutC,Y+0x20		; load volume value from SRAM 0x220 + YL
-    sbrs    TMP,b2			; if channel is disabled in mixer - set volume to zero
+    lds     YL, AY_REG10		; Load Channel C Amplitude register
+    mov     OutC, EVal		; set envelope volume as default value
+    sbrs    YL, b4			; if bit 4 is not set in amplitude register then translate it to volume
+    ldd     OutC, Y+0x20		; load volume value from SRAM 0x220 + YL
+    sbrs    TMP, b2			; if channel is disabled in mixer - set volume to zero
     clr     OutC
 
     ; update PWM counters
