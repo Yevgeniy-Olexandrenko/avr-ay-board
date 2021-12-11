@@ -7,7 +7,7 @@ byte serial_read()
 
 void setup()
 {
-    psg_init();
+    PSG_Init();
     Serial.begin(57600);
 }
 
@@ -21,6 +21,6 @@ void loop()
 
         // read data and send everything to PSG
         byte data = serial_read();
-        psg_send(reg, data);
+        PSG_Send(reg, data);
     }
 }
