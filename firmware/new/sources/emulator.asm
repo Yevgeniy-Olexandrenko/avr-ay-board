@@ -65,10 +65,12 @@
     ; ZH <- 0x01 - high byte of register Z used for fast acces to register values
 
     ; SRAM zones:
+    ; --------------------------------------------------------------------------
     ; 0x0100 - 0x010F - register masks
     ; 0x0110 - 0x011F - current registers values
-    ; 0x0120 - 0x012F - inverted low bits of register values (b0-b5)
-    ; 0x0130 - 0x013F - inverted high bits of register values (b6-b7)
+    ; 0x0120 - 0x012F - inverted low bits of register values (D0-D5)
+    ; 0x0130 - 0x013F - inverted high bits of register values (D6-D7)
+    ; --------------------------------------------------------------------------
     ; 0x0210 - 0x021F - envelope codes
     ; 0x0220 - 0x022F - volume table for tone/noise amplitude
     ; 0x0230 - 0x024F - volume table for envelope amplitude
@@ -173,7 +175,6 @@ LATCH_REG_ADDR:                    ; TODO: use common latch reg mode code
     InReg   ADDR, PinC              ; [ ] receive register number
     ldd     BusOut1, Z+0x20         ; [2] load value from SRAM
     ldd     BusOut2, Z+0x30         ; [2] load value from SRAM
-    OutReg  EIFR, YH                ; [ ] reset ext. interrupt flags (TODO: may be not needed inside interrupt)
     reti                            ; [4] leave interrupt
 
 ISR_INT1:                           ; [4] enter interrupt
@@ -187,22 +188,25 @@ ISR_INT1:                           ; [4] enter interrupt
     ; 33 * 42 = 1386ns for 24MHz O.K.
     ; 33 * 40 = 1320ns for 25MHz O.K.
     ; 33 * 37 = 1221ns for 27MHz O.K.
+    InReg   SREGSave, SREG          ; [1] save SREG
+
     InReg   BusData, PinC           ; [1]
     InReg   BusOut1, PinD           ; [1]
-    InReg   SREGSave, SREG          ; [1] save SREG
     and     BusOut1, CC0            ; [1]
     or      BusData, BusOut1        ; [1] construct register value from 2 ports
+
+    ld      BusOut2, Z              ; [2] load register mask from SRAM
+    and     BusData, BusOut2        ; [1] apply register mask
+    std     Z+0x10, BusData         ; [2] put register value to SRAM
+
     mov     BusOut1, BusData        ; [1]
     com     BusOut1                 ; [1] invert register value
     std     Z+0x20, BusOut1         ; [2] put inverted register value to SRAM for read mode (6 low bits)
 
-    ld      BusOut2, Z              ; [2] load register mask from SRAM
-    and     BusData, BusOut2        ; [1] apply register mask
-
     mov     BusOut2, BusOut1        ; [1]
     and     BusOut2, CC0            ; [1]
     std     Z+0x30, BusOut2         ; [2] put inverted register value to SRAM for read mode (2 high bits)
-    std     Z+0x10, BusData         ; [2] put register value to SRAM
+   
     cpi     ADDR, 0x0D              ; [1] check for register 13
     brne    NO_ENVELOPE_CHANGED_P   ; [1]
     ori     TNLevel, 0x80           ; [1] set flag that register 13 changed
@@ -232,6 +236,7 @@ RECV_REG_VALUE:                     ; <= receive register value
     ld      BusOut1, Z              ; load register mask
     and     BusData, BusOut1        ; apply register mask
     std     Z+0x10, BusData         ; put register value to SRAM
+
     cpi     ADDR, 0x0D              ; check for envelope shape register
     brne    NO_ENVELOPE_CHANGED_S
     ori     TNLevel, 0x80           ; set envelope change flag (bit 7)
