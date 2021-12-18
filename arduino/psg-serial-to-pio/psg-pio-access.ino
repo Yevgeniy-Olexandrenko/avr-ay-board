@@ -23,7 +23,6 @@
 #define PIN_BDIR PB1   // Arduino pin D9
 
 // timing delays (nano seconds)
-#define PSG_Delay(ns) _delay_us(0.001f * (ns))
 #define tAS 800 // min 400 ns by datasheet
 #define tAH 100 // min 100 ns by datasheet
 #define tDW 500 // min 500 ns by datasheet
@@ -35,17 +34,21 @@
 #define CLK_177_MHz 9
 #define CLK_200_MHz 8
 
+// Helpers
+#define PSG_Delay(ns) _delay_us(0.001f * (ns))
+#define INLINE __attribute__ ((inline))
+
 // -----------------------------------------------------------------------------
-// Low Level Access
+// Control Bus and Data Bus handling
 // -----------------------------------------------------------------------------
 
-void PSG_GetDataBus(byte& data)
+INLINE void PSG_GetDataBus(byte& data)
 {
     // get bata bits from input ports
     data = (LSB_PIN & LSB_MASK) | (MSB_PIN & MSB_MASK);
 }
 
-void PSG_SetDataBus(byte data)
+INLINE void PSG_SetDataBus(byte data)
 {
     // set ports to output
     LSB_DDR |= LSB_MASK;
@@ -56,7 +59,7 @@ void PSG_SetDataBus(byte data)
     MSB_PORT = (MSB_PORT & ~MSB_MASK) | (data & MSB_MASK);
 }
 
-void PSG_ReleaseDataBus()
+INLINE void PSG_FreeDataBus()
 {
     // setup ports to input
     LSB_DDR &= ~LSB_MASK;
@@ -67,37 +70,56 @@ void PSG_ReleaseDataBus()
     MSB_PORT |= MSB_MASK;
 }
 
-void PSG_Inactive()
+INLINE void PSG_SetControlBusAddr()
+{
+    BUS_PORT |= (1 << PIN_BDIR | 1 << PIN_BC1);
+}
+
+INLINE void PSG_SetControlBusWrite()
+{
+    BUS_PORT |= (1 << PIN_BDIR);
+}
+
+INLINE void PSG_SetControlBusRead()
+{
+    BUS_PORT |= (1 << PIN_BC1);
+}
+
+INLINE void PSG_SetControlBusInactive()
 {
     BUS_PORT &= ~(1 << PIN_BDIR | 1 << PIN_BC1);
 }
 
+// -----------------------------------------------------------------------------
+// Low Level Access
+// -----------------------------------------------------------------------------
+
 void PSG_Address(byte reg)
 {
     PSG_SetDataBus(reg);
-    BUS_PORT |= (1 << PIN_BDIR | 1 << PIN_BC1);
+    PSG_SetControlBusAddr();
     PSG_Delay(tAS);
-    PSG_Inactive();
+    PSG_SetControlBusInactive();
     PSG_Delay(tAH);
-    PSG_ReleaseDataBus();
+    PSG_FreeDataBus();
 }
 
 void PSG_Write(byte data)
 {
     PSG_SetDataBus(data);
-    BUS_PORT |= (1 << PIN_BDIR);
+    PSG_SetControlBusWrite();
     PSG_Delay(tDW);
-    PSG_Inactive();
+    PSG_SetControlBusInactive();
     PSG_Delay(tDH);
-    PSG_ReleaseDataBus();
+    PSG_FreeDataBus();
 }
 
 void PSG_Read(byte& data)
 {
-    BUS_PORT |= (1 << PIN_BC1);
+    PSG_SetControlBusRead();
     PSG_Delay(tDA);
     PSG_GetDataBus(data);
-    PSG_Inactive();
+    PSG_SetControlBusInactive();
     PSG_Delay(tTS);
 }
 
@@ -117,8 +139,8 @@ void PSG_Init()
     // setup control and data bus
     BUS_DDR |= (1 << PIN_BDIR);
     BUS_DDR |= (1 << PIN_BC1);
-    PSG_Inactive();
-    PSG_ReleaseDataBus();
+    PSG_SetControlBusInactive();
+    PSG_FreeDataBus();
 }
 
 void PSG_Send(byte reg, byte data)
