@@ -1,4 +1,6 @@
-
+volatile byte buffer[256];
+volatile byte wr_ptr = 0;
+volatile byte rd_ptr = 0;
 volatile byte reg = 0xFF;
 
 ISR(USART_RX_vect)
@@ -8,7 +10,8 @@ ISR(USART_RX_vect)
     {
         if (reg <= 15)
         {
-            PSG_Send(reg, data);
+            buffer[wr_ptr++] = reg;
+            buffer[wr_ptr++] = data;
             reg = 0xFF;
         }
         else if (data <= 15)
@@ -24,7 +27,6 @@ void setup()
 
     PSG_Init();
 
-    // serial init at 57600
     UBRR0H = 0;
     UBRR0L = 0x10;
     UCSR0C = 0x06;
@@ -37,4 +39,13 @@ void setup()
 
 void loop()
 {
+    while(true)
+    {
+        while(rd_ptr != wr_ptr)
+        {
+            byte reg  = buffer[rd_ptr++];
+            byte data = buffer[rd_ptr++];
+            PSG_Send(reg, data);
+        }
+    }
 }
