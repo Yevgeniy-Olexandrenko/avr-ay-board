@@ -1,18 +1,20 @@
 #include <util/delay.h>
 
 // -----------------------------------------------------------------------------
+// Configuration
+// -----------------------------------------------------------------------------
 
 // data bus bits D0-D3 (Arduino pins A0-A3)
 #define LSB_DDR  DDRC
 #define LSB_PORT PORTC
 #define LSB_PIN  PINC
-#define LSB_MASK 0b00001111
+#define LSB_MASK 0x0F
 
 // data bus bits D4-D7 (Arduino pins D4-D7)
 #define MSB_DDR  DDRD
 #define MSB_PORT PORTD
 #define MSB_PIN  PIND
-#define MSB_MASK 0b11110000
+#define MSB_MASK 0xF0
 
 // control bus BC1 and BDIR signals
 #define BUS_PORT PORTB
@@ -20,92 +22,107 @@
 #define PIN_BC1  PB0   // Arduino pin D8
 #define PIN_BDIR PB1   // Arduino pin D9
 
+// timing delays (nano seconds)
+#define PSG_Delay(ns) _delay_us(0.001f * (ns))
+#define tAS 3000
+#define tAH 1000
+#define tDW 5000
+#define tDA 2000
+
+// MCU clock to PSG clock deviders
+#define CLK_177_MHz 9
+#define CLK_200_MHz 8
+
+// -----------------------------------------------------------------------------
+// Low Level Access
 // -----------------------------------------------------------------------------
 
-void psg_data_set(byte data)
+void PSG_SetDataBus(byte data)
 {
     // set ports to output
-    LSB_DDR  |= LSB_MASK;
-    MSB_DDR  |= MSB_MASK;
+    LSB_DDR |= LSB_MASK;
+    MSB_DDR |= MSB_MASK;
 
     // set data bits to output ports
     LSB_PORT = (LSB_PORT & ~LSB_MASK) | (data & LSB_MASK);
     MSB_PORT = (MSB_PORT & ~MSB_MASK) | (data & MSB_MASK);
 }
 
-void psg_data_get(byte& data)
+void PSG_GetDataBus(byte& data)
 {
     // get bata bits from input ports
     data = (LSB_PIN & LSB_MASK) | (MSB_PIN & MSB_MASK);
 }
 
-void psg_inactive()
+void PSG_Inactive()
 {
     BUS_PORT &= ~(1 << PIN_BDIR | 1 << PIN_BC1);
 
-    // set ports to input
-    LSB_DDR  &= ~LSB_MASK;
-    MSB_DDR  &= ~MSB_MASK;
+    // setup ports to input
+    LSB_DDR &= ~LSB_MASK;
+    MSB_DDR &= ~MSB_MASK;
 
     // enable pull-up resistors
-    LSB_PORT = (LSB_PORT & ~LSB_MASK) | (0xFF & LSB_MASK);
-    MSB_PORT = (MSB_PORT & ~MSB_MASK) | (0xFF & MSB_MASK);
+    LSB_PORT |= LSB_MASK;
+    MSB_PORT |= MSB_MASK;
 }
 
-void psg_address(byte reg)
+void PSG_Address(byte reg)
 {
-    psg_data_set(reg);
+    PSG_SetDataBus(reg);
     BUS_PORT |= (1 << PIN_BDIR | 1 << PIN_BC1);
-    _delay_us(0.300);
-    psg_inactive();
-    _delay_us(0.100);
+    PSG_Delay(tAS);
+    PSG_Inactive();
+    PSG_Delay(tAH);
 }
 
-void psg_write(byte data)
+void PSG_Write(byte data)
 {
-    psg_data_set(data);
+    PSG_SetDataBus(data);
     BUS_PORT |= (1 << PIN_BDIR);
-    _delay_us(0.500);
-    psg_inactive();
+    PSG_Delay(tDW);
+    PSG_Inactive();
 }
 
-void psg_read(byte& data)
+void PSG_Read(byte& data)
 {
     BUS_PORT |= (1 << PIN_BC1);
-    _delay_us(0.200);
-    psg_data_get(data);
-    psg_inactive();
+    PSG_Delay(tDA);
+    PSG_GetDataBus(data);
+    PSG_Inactive();
 }
 
 // -----------------------------------------------------------------------------
+// High Level Access
+// -----------------------------------------------------------------------------
 
-void psg_init()
+void PSG_Init()
 {
     // 1.77 MHz on pin D3 (PD3)
     DDRD  |= (1 << PD3);
     TCCR2A = (1 << COM2B1) | (1 << WGM21) | (1 << WGM20);
     TCCR2B = (1 << WGM22) | (1 << CS20);
-    OCR2A  = 8;
-    OCR2B  = 3; 
+    OCR2A  = (CLK_177_MHz - 1);
+    OCR2B  = (CLK_177_MHz / 2); 
 
-    // init pins for output
+    // setup control pins for output
     BUS_DDR |= (1 << PIN_BDIR);
     BUS_DDR |= (1 << PIN_BC1);
 
-    // inactive mode
-    psg_inactive();
+    // start with inactive mode
+    PSG_Inactive();
 }
 
-void psg_send(byte reg, byte data)
+void PSG_Send(byte reg, byte data)
 {
-    psg_address(reg);
-    psg_write(data);
+    PSG_Address(reg);
+    PSG_Write(data);
 }
 
-byte psg_receive(byte reg)
+byte PSG_Receive(byte reg)
 {
     byte data;
-    psg_address(reg);
-    psg_read(data);
+    PSG_Address(reg);
+    PSG_Read(data);
     return data;
 }

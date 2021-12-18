@@ -1,6 +1,9 @@
 
-byte regsLow[32];
-byte regsInst[32];
+#define NUM 16
+#define PAT 0xFF
+
+byte regsLow[NUM];
+byte regsInst[NUM];
 
 void print_hex(byte data)
 {
@@ -10,28 +13,28 @@ void print_hex(byte data)
 
 void setup()
 {
-    psg_init();
+    PSG_Init();
     Serial.begin(9600);
 
-    for (byte reg = 0; reg < 32; ++reg)
+    for (byte reg = 0; reg < NUM; ++reg)
     {
-        psg_send(reg, 0xFF);
+        PSG_Send(reg, PAT);
     }
 
-    for (byte reg = 0; reg < 32; ++reg)
+    for (byte reg = 0; reg < NUM; ++reg)
     {
-        regsLow[reg] = psg_receive(reg);
+        regsLow[reg] = PSG_Receive(reg);
     }
 
-    for (byte reg = 0; reg < 32; ++reg)
+    for (byte reg = 0; reg < NUM; ++reg)
     {
-        psg_address(reg);
-        psg_write(0xFF);
-        psg_read(regsInst[reg]);
+        PSG_Address(reg);
+        PSG_Write(PAT);
+        PSG_Read(regsInst[reg]);
     }
     
     Serial.println("Test1");
-    for (byte reg = 0; reg < 32; ++reg)
+    for (byte reg = 0; reg < NUM; ++reg)
     {
         Serial.print("R[");
         print_hex(reg);
@@ -41,7 +44,7 @@ void setup()
     }
 
     Serial.println("Test2");
-    for (byte reg = 0; reg < 32; ++reg)
+    for (byte reg = 0; reg < NUM; ++reg)
     {
         Serial.print("R[");
         print_hex(reg);
