@@ -24,6 +24,10 @@
     .equ b6 = 0x06
     .equ b7 = 0x07
 
+    ; control signals
+    .equ PD_BC1  = b2
+    .equ PD_BDIR = b3
+
     ; register variables:
     .def OutA       = r0    ; Channel A output volume
     .def OutC       = r1    ; Channel C output volume
@@ -133,8 +137,8 @@ RegsMask:
 ; Parallel communication mode (BC1 on PD2/INT0, BDIR on PD3/INT1)
 ; ==============================================================================
 ISR_INT0:                           ; [4] enter interrupt
-    sbic    PinD, b3                ; [2/1] check BDIR bit, skip next if clear
-    rjmp    LATCH_REG_ADDR0         ; [0/2]
+    sbic    PinD, PD_BDIR           ; [2/1] check BDIR bit, skip next if clear
+    rjmp    LATCH_REG_ADDR          ; [0/2]
 
     ; [ READ MODE ] (BC1=1, BDIR=0)
     ; --------------------------------------------------------------------------
@@ -143,34 +147,38 @@ ISR_INT0:                           ; [4] enter interrupt
     ; 8 * 40ns = 320ns for 25MHz O.K.
     ; 8 * 42ns = 336ns for 24MHz O.K.
     ; 8 * 50ns = 400ns for 20MHz !!!!
-    OutReg  DDRD, BusOut2           ; [1] turn pins to output
-    OutReg  DDRC, BusOut1           ; [1]
+    OutReg  DDRC, BusOut1           ; [1] output -> low level on D0-D5
+    OutReg  DDRD, BusOut2           ; [1] output -> low level on D6-D7
 
-LOOP_NOT_INACTIVE:                  ; loop while BC1=1
+WAIT_FOR_INACTIVE:                  ; loop while BC1=1
     ; 400ns max for release data bus, 9 cycles min
     ; 9 * 50 = 450ns for 20MHz !!!!
     ; 9 * 42 = 378ns for 24MHz O.K.
     ; 9 * 40 = 360ns for 25MHz O.K.
     ; 9 * 37 = 333ns for 27MHz O.K.
-    sbic    PinD, b2                ; [2/1] check BC1 bit, skip next if clear
-    rjmp    LOOP_NOT_INACTIVE       ; [0/2]
-    OutReg  DDRC, C00               ; [1] turn pins to input
-    OutReg  DDRD, C00               ; [1]
+    sbic    PinD, PD_BC1            ; [2/1] check BC1 bit, skip next if clear
+    rjmp    WAIT_FOR_INACTIVE       ; [0/2]
+    OutReg  DDRC, C00               ; [1] input -> Z-state on D0-D5
+    OutReg  DDRD, C00               ; [1] input -> Z-state on D6-D7
     reti                            ; [4] leave interrupt
 
-LATCH_REG_ADDR0:                    ; TODO: use common latch reg mode code
+LATCH_REG_ADDR:                    ; TODO: use common latch reg mode code
     ; [ LATCH ADDRESS MODE ] (BC1=1, BDIR=1)
     ; --------------------------------------------------------------------------
+    ; 350ns min, 16 cycles
+    ; 16 * 50 = 800ns for 20MHz mb O.K., but hz :)))
+    ; 16 * 42 = 672ns for 24MHz mb O.K.
+    ; 16 * 40 = 640ns for 25MHz mb O.K.
+    ; 16 * 37 = 592ns for 27MHz mb O.K.
     InReg   ADDR, PinC              ; [ ] receive register number
-    ldd     BusOut1, Z+0x20         ; [ ] load value from SRAM
-    ldd     BusOut2, Z+0x30         ; [ ] load value from SRAM
+    ldd     BusOut1, Z+0x20         ; [2] load value from SRAM
+    ldd     BusOut2, Z+0x30         ; [2] load value from SRAM
     OutReg  EIFR, YH                ; [ ] reset ext. interrupt flags (TODO: may be not needed inside interrupt)
     reti                            ; [4] leave interrupt
 
 ISR_INT1:                           ; [4] enter interrupt
-    InReg   BusData, PinC           ; [ ] TODO: move to write reg mode
-    sbic    PinD, b2                ; [2/1] check BC1 bit, skip next if clear
-    rjmp    LATCH_REG_ADDR1         ; [0/2]
+    sbic    PinD, PD_BC1            ; [2/1] check BC1 bit, skip next if clear
+    rjmp    LATCH_REG_ADDR          ; [0/2]
 
     ; [ WRITE REGISTER MODE ] (BC1=0, BDIR=1)
     ; --------------------------------------------------------------------------
@@ -179,6 +187,7 @@ ISR_INT1:                           ; [4] enter interrupt
     ; 33 * 42 = 1386ns for 24MHz O.K.
     ; 33 * 40 = 1320ns for 25MHz O.K.
     ; 33 * 37 = 1221ns for 27MHz O.K.
+    InReg   BusData, PinC           ; [1]
     InReg   BusOut1, PinD           ; [1]
     InReg   SREGSave, SREG          ; [1] save SREG
     and     BusOut1, CC0            ; [1]
@@ -200,20 +209,6 @@ ISR_INT1:                           ; [4] enter interrupt
 
 NO_ENVELOPE_CHANGED_P:
     OutReg  SREG, SREGSave          ; [1]
-    reti                            ; [4] leave interrupt
-
-LATCH_REG_ADDR1:                    ; TODO: use common latch reg mode code
-    ; [ LATCH ADDRESS MODE ] (BC1=1, BDIR=1)
-    ; --------------------------------------------------------------------------
-    ; 350ns min, 16 cycles
-    ; 16 * 50 = 800ns for 20MHz mb O.K., but hz :)))
-    ; 16 * 42 = 672ns for 24MHz mb O.K.
-    ; 16 * 40 = 640ns for 25MHz mb O.K.
-    ; 16 * 37 = 592ns for 27MHz mb O.K.
-    mov     ADDR, BusData           ; [ ] receive register number
-    ldd     BusOut1, Z+0x20         ; [2] load value from SRAM
-    ldd     BusOut2, Z+0x30         ; [2] load value from SRAM
-    OutReg  EIFR, YH                ; [ ] reset ext. interrupt flags (TODO: may be not needed inside interrupt)
     reti                            ; [4] leave interrupt
 
 ; ==============================================================================
@@ -296,21 +291,21 @@ L0:
     ldi     zl, low(2*Envelopes)
     ldi     zh, high(2*Envelopes)
     ldi     r18, 0x10
-    rcall   _COPY
+    rcall   COPY
 
     ; load volume table for amplitude to SRAM 0x220, 16 bytes
     ldi     xl, 0x20
     ldi     zl, low(2*TVolumes)
     ldi     zh, high(2*TVolumes)
     ldi     r18, 0x10
-    rcall   _COPY
+    rcall   COPY
 
     ; load volume table for envelopes to SRAM 0x230, 32 bytes
     ldi     xl, 0x30
     ldi     zl, low(2*EVolumes)
     ldi     zh, high(2*EVolumes)
     ldi     r18, 0x20
-    rcall   _COPY
+    rcall   COPY
 
     ; load register masks to SRAM 0x100, 16 bytes
     clr     xl
@@ -318,7 +313,7 @@ L0:
     ldi     zl, low(2*RegsMask)
     ldi     zh, high(2*RegsMask)
     ldi     r18, 0x10
-    rcall   _COPY
+    rcall   COPY
 
     ldi     ZH, 0x01                ; set high byte of register Z for fast acces to register values
     ldi     YH, 0x02                ; set high byte of register Y for fast acces to volume table
