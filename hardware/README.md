@@ -1,4 +1,4 @@
-# Latest PCB v1.3 #
+### Latest PCB v1.3 ###
 
 Top side:
 
