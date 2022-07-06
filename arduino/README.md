@@ -1,4 +1,4 @@
-## PSG to Arduino connection ##
+### PSG to Arduino connection ###
 
 AY-3-8910|AY-3-8912|PSG Signal|Arduino|ATMega328|Description
 -|-|-|-|-|-
