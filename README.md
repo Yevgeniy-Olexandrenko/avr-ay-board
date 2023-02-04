@@ -82,4 +82,4 @@ The default hardware configuration of the device assumes the use of an ATmega48P
 3. [Discussion on ZX-PK.ru](https://zx-pk.ru/threads/10510-emulyator-ay-8910-na-atmega.html)
 4. [AY-3-8910/12 Datasheet](/datasheet/AY-3-8910-microchip.pdf)
 5. [YM2149 Datasheet](/datasheet/ym2149-yamaha.pdf)
-6. [ATmega48 Datasheet](/datasheet/ATmega88.pdf)
+6. [ATmega48 Datasheet](/datasheet/ATmega48.pdf)
