@@ -19,7 +19,7 @@ Baud Rate|Data Bits|Stop Bits|Parity
 
 Registers are sent as a pair of values: register number (0-13), then register value. To synchronize, just send `0xFF` at the start of sending.
 
-This sound chip emulator can be used in conjunction with the [AVR-AY Player](https://www.avray.ru/avr-ay-player) or [PSG Tools](https://github.com/Yevgeniy-Olexandrenko/psg-tools). You will need the most ordinary USB to serial TTL converter. Just connect '+5V', 'GND' and 'TX' pins of the converter to 'VCC', 'GND' and 'RX' pins of this emulation device, open corrsponding 'COM' port in the player/tool and start playing music.
+This sound chip emulator can be used in conjunction with the [AVR-AY Player](https://www.avray.ru/avr-ay-player) or [PSG Tools](https://github.com/Yevgeniy-Olexandrenko/psg-tools). You will need the most ordinary USB to serial TTL converter. Just connect `+5V`, `GND` and `TX` pins of the converter to `VCC`, `GND` and `RX` pins of this emulation device, open corrsponding `COM` port in the player/tool and start playing music.
 
 ### Parallel communication mode
 
