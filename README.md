@@ -27,13 +27,13 @@ This sound chip emulator can be used in conjunction with the [AVR-AY Player](htt
 
 # Hardware
 
-The '[schematic](/hardware/v1.3/AY-3-8912-Emulator-v1.3_Schematic.pdf)' of the device is quite simple. The heart of the emulator is a 8-bit ATmega series microcontroller, which runs at an overclocked frequency and performs low-level simulation of the sound chip. The rest of the device is three low-pass filters with a cutoff frequency of about 20 kHz, three communication interfaces and three output audio channels with analog signal waveform.
+The [schematic](/hardware/v1.3/AY-3-8912-Emulator-v1.3_Schematic.pdf) of the device is quite simple. The heart of the emulator is a 8-bit ATmega series microcontroller, which runs at an overclocked frequency and performs low-level simulation of the sound chip. The rest of the device is three low-pass filters with a cutoff frequency of about 20 kHz, three communication interfaces and three output audio channels with analog signal waveform.
 
 ### Serial interface
 
 Pin|Name|Function
 -|-|-
-1|`GND`|Ground reference
+1|`GND`|Ground
 2|`VCC`|Power Supply (+5V)
 3|`TX`|Serial dada output (Speaker Input for AVR-AY)
 4|`RX`|Serial Data Input
@@ -67,11 +67,13 @@ Pin|Name|Function|Pin|Name|Function
 
 ### Hardware configuration
 
-The default hardware configuration of the device assumes the use of an ATmega88PA microcontroller with a 27 MHz crystal resonator. According to reviews, it should work reliably. But you are free to use another microcontroller (ATmega8, ATmega48, ATmega168 and ATmega328) and a quartz resonator with another frequency (20 MHz, 24 MHz, 25 MHz, 28.332 MHz, 28 MHz, 30 MHz, 32 MHz and 40 MHz). It should be clear that firmware with full functionality (standard) may be unstable at a lower operation frequency. In this case, you need to use the firmware configuration for the specific communication interface.
+The default hardware configuration of the device assumes the use of an ATmega48PA microcontroller with a 27 MHz crystal resonator. According to feedbacks, it should work reliably. But you are free to use another microcontroller (ATmega8, ATmega88, ATmega168 and ATmega328) and a quartz resonator with another frequency (20 MHz, 24 MHz, 25 MHz, 28.332 MHz, 28 MHz, 30 MHz, 32 MHz and 40 MHz).
+
+...
 
 # Firmware
 
-TODO
+...
 
 # References, Links and Notes
 
@@ -80,4 +82,4 @@ TODO
 3. [Discussion on ZX-PK.ru](https://zx-pk.ru/threads/10510-emulyator-ay-8910-na-atmega.html)
 4. [AY-3-8910/12 Datasheet](/datasheet/AY-3-8910-microchip.pdf)
 5. [YM2149 Datasheet](/datasheet/ym2149-yamaha.pdf)
-6. [ATmega88 Datasheet](/datasheet/ATmega88.pdf)
+6. [ATmega48 Datasheet](/datasheet/ATmega88.pdf)
