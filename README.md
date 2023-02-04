@@ -5,10 +5,9 @@
 ![Photo](/hardware/photo.jpg)
 
 ### Features:
-- Complete sound chip emulation
-- Parallel mode support (Read mode also supported)
-- Serial mode support using `RX` pin at speed 57600
-- Speaker input support using `SPK` pin
+- Complete chip emulation (sound generation only)
+- Parallel mode write/read operations support
+- Serial mode write operations support
 
 # Usage
 
@@ -20,110 +19,24 @@ Baud Rate|Data Bits|Stop Bits|Parity
 
 Registers are sent as a pair of values: register number (0-13), then register value. To synchronize, just send `0xFF` at the start of sending.
 
-This sound chip emulator can be used in conjunction with the [AVR-AY Player](https://www.avray.ru/avr-ay-player). You will need the most ordinary USB to serial TTL converter. Just connect +5V, GND and TX pins of the converter to VCC, GND and RX pins of this emulation device, choose COM port, `Open` it in the player and start playing music.
+This sound chip emulator can be used in conjunction with the [AVR-AY Player](https://www.avray.ru/avr-ay-player) or [PSG Tools](https://github.com/Yevgeniy-Olexandrenko/psg-tools). You will need the most ordinary USB to serial TTL converter. Just connect '+5V', 'GND' and 'TX' pins of the converter to 'VCC', 'GND' and 'RX' pins of this emulation device, open corrsponding 'COM' port in the player/tool and start playing music.
 
 ### Parallel communication mode
 
-Following Arduino sketch is for parallel data streaming to a sound chip emulator. Data is received by the Arduino via the corresponding COM port and sent to the chip in parallel. For quick and easy testing, you can use the **AVR-AY Player** as described in the previous section. Just select the COM port of the Arduino board.
-
-```c
-// data bus bits D0-D3 (Arduino pins A0-A3)
-#define LSB_PORT PORTC
-#define LSB_DDR  DDRC
-#define LSB_MASK 0b00001111
-
-// data bus bits D4-D7 (Arduino pins D4-D7)
-#define MSB_PORT PORTD
-#define MSB_DDR  DDRD
-#define MSB_MASK 0b11110000
-
-// control bus BC1 and BDIR signals
-#define BUS_PORT PORTB
-#define BUS_DDR  DDRB
-#define PIN_BC1  PB0   // Arduino pin D8
-#define PIN_BDIR PB1   // Arduino pin D9
-
-byte serial_read()
-{
-    while (!Serial.available()) _delay_us(1);
-    return Serial.read();
-}
-
-void psg_data(byte data)
-{
-    LSB_PORT = (LSB_PORT & ~LSB_MASK) | (data & LSB_MASK);
-    MSB_PORT = (MSB_PORT & ~MSB_MASK) | (data & MSB_MASK);
-}
-
-void psg_inactive()
-{
-    BUS_PORT &= ~(1 << PIN_BDIR | 1 << PIN_BC1);
-}
-
-void psg_address()
-{
-    BUS_PORT |= (1 << PIN_BDIR | 1 << PIN_BC1);
-    _delay_us(0.300);
-    psg_inactive();
-}
-
-void psg_write()
-{
-    BUS_PORT |= (1 << PIN_BDIR);
-    _delay_us(0.300);
-    psg_inactive();
-}
-
-void psg_send(byte reg, byte data)
-{
-    psg_data(reg);
-    psg_address();
-    psg_data(data);
-    psg_write();
-}
-
-void setup()
-{
-    // init pins for output
-    LSB_DDR |= LSB_MASK;
-    MSB_DDR |= MSB_MASK;
-    BUS_DDR |= (1 << PIN_BDIR);
-    BUS_DDR |= (1 << PIN_BC1);
-
-    // inactive mode
-    psg_inactive();
-
-    // serial init
-    Serial.begin(57600);
-}
-
-void loop()
-{
-    while (true)
-    {
-        // wait for register number
-        byte reg = serial_read();
-        if (reg > 13) continue;
-
-        // read data and send everything to PSG
-        byte data = serial_read();
-        psg_send(reg, data);
-    }
-}
-```
+...
 
 # Hardware
 
-The [schematic](/hardware/AY-3-8912-Emulator-v1.1_Schematic.pdf) of the device is quite simple. The heart of the emulator is a 8-bit ATmega series microcontroller, which runs at an overclocked frequency and performs low-level simulation of the sound chip. The rest of the device is three low-pass filters with a cutoff frequency of about 20 kHz and three communication interfaces. An analog signals of three audio channels are generated at the output of the emulator.
+The '[schematic](/hardware/v1.3/AY-3-8912-Emulator-v1.3_Schematic.pdf)' of the device is quite simple. The heart of the emulator is a 8-bit ATmega series microcontroller, which runs at an overclocked frequency and performs low-level simulation of the sound chip. The rest of the device is three low-pass filters with a cutoff frequency of about 20 kHz, three communication interfaces and three output audio channels with analog signal waveform.
 
 ### Serial interface
 
 Pin|Name|Function
 -|-|-
-1|`GND`|Ground
+1|`GND`|Ground reference
 2|`VCC`|Power Supply (+5V)
-3|`SPK`|Speaker Input
-4|`RX`| Serial Data Input
+3|`TX`|Serial dada output (Speaker Input for AVR-AY)
+4|`RX`|Serial Data Input
 
 ### Parallel interface
 
