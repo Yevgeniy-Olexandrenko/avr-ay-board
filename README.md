@@ -43,19 +43,19 @@ Pin|Name|Function
 Pin|Name|Function|Pin|Name|Function
 -|-|-|-|-|-
 1|`C`|Analog Channel C|28|`D0`|Data/Address 0
-2|`NC`|*no connect*|27|`D1`|Data/Address 1
+2|`TEST`|*no connection*|27|`D1`|Data/Address 1
 3|`VCC`|Power Supply (+5V)|26|`D2`|Data/Address 2
 4|`B`|Analog Channel B|25|`D3`|Data/Address 3
 5|`A`|Analog Channel A|24|`D4`|Data/Address 4
 6|`GND`|Ground|23|`D5`|Data/Address 5
-7|`NC`|*no connect*|22|`D6`|Data/Address 6
-8|`NC`|*no connect*|21|`D7`|Data/Address 7
-9|`NC`|*no connect*|20|`BC1`|Bus Control 1
-10|`NC`|*no connect*|19|`NC`|*no connect*
-11|`NC`|*no connect*|18|`BDIR`|Bus Direction
-12|`NC`|*no connect*|17|`NC`|*no connect*
-13|`NC`|*no connect*|16|`RES`|Reset (Low active)
-14|`NC`|*no connect*|15|`NC`|*no connect*
+7|`IOA7`|*not implemented*|22|`D6`|Data/Address 6
+8|`IOA6`|*not implemented*|21|`D7`|Data/Address 7
+9|`IOA5`|*not implemented*|20|`BC1`|Bus Control 1
+10|`IOA4`|*not implemented*|19|`BC2`|*not implemented*
+11|`IOA3`|*not implemented*|18|`BDIR`|Bus Direction
+12|`IOA2`|*not implemented*|17|`A8`|*not implemented*
+13|`IOA1`|*not implemented*|16|`RES`|Reset (Low active)
+14|`IOA0`|*not implemented*|15|`CLK`|*not implemented*
 
 ### In-Circuit Serial Programming interface
 
