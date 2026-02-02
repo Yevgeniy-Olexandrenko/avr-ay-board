@@ -1,10 +1,24 @@
-# Introduction
+# AY-3-8912 Emulator
 
 AY-3-8912 Emulator is a replacement board for AY-3-8910, AY-3-8912, and YM2149F sound chips, designed for the DIP-28 form factor.
 
 ![Photo](/hardware/v1.3/AY-3-8912-Emulator-v1.3_Photo.jpg)
 
-# Features
+# Hardware
+
+TODO
+
+- DIP-28 form factor, pin-compatible with AY/YM family
+- MCU-based PSG emulation implemented in firmware
+- PWM-based audio outputs with analog low-pass filtering
+- External EEPROM for configuration storage
+- ICSP interface for firmware flashing and debugging
+
+# Firmware
+
+The emulator aims to reproduce original AY/YM behavior at the register and audio level.
+Due to architectural differences between the MCU-based implementation and original chips,
+some timing and analog characteristics may differ.
 
 Feature|FW 1.0|Comment
 -|:-:|-
@@ -38,19 +52,7 @@ In-Circuit Serial Programming (ICSP)|✅|Via ICSP pins (or via PIO pins since HW
 - Serial read access
 - Firmware configuration via jumpers (J1/J2)
 
----
-
-## Hardware Overview
-
-- DIP-28 form factor, pin-compatible with AY/YM family
-- MCU-based PSG emulation implemented in firmware
-- PWM-based audio outputs with analog low-pass filtering
-- External EEPROM for configuration storage
-- ICSP interface for firmware flashing and debugging
-
----
-
-## Communication Interfaces
+# Communication
 
 ### Parallel I/O Interface
 
@@ -71,65 +73,3 @@ An alternative serial interface is provided for register access and debugging pu
 
 Protocol description:
 - See `docs/serial_protocol.md`
-
----
-
-## Firmware
-
-The firmware implements PSG emulation logic and hardware signal handling.
-
-- Developed using **Microchip Studio**
-- Separate firmware builds for AY-3-8910/AY-3-8912 and YM2149F behavior
-- MCU handles parallel bus interrupts, audio generation, and configuration logic
-
----
-
-### Build and Flash
-
-Firmware build and flashing process:
-
-- Build environment: Microchip Studio
-- Flashing tool: `avrdude`
-- EEPROM configuration file is required
-- MCU fuse settings must match the selected clock configuration
-
-Detailed instructions:
-- See `docs/build_and_flash.md`
-
----
-
-## Configuration
-
-The emulator uses EEPROM-stored parameters to configure runtime behavior, including:
-
-- Internal clock frequency
-- Audio output parameters
-- Interface-related options
-
-Configuration format and examples:
-- See `docs/eeprom_config.md`
-
----
-
-## Emulation Notes
-
-The emulator aims to reproduce original AY/YM behavior at the register and audio level.
-Due to architectural differences between the MCU-based implementation and original chips,
-some timing and analog characteristics may differ.
-
-Known behavior details and quirks:
-- See `docs/emulation_notes.md`
-
----
-
-## Repository Structure
-
-- `firmware/` — MCU firmware source code
-- `hardware/` — schematics, PCB layouts, board revisions, photos
-- `docs/` — protocols, build instructions, configuration and emulation notes
-
----
-
-## Project Status
-
-Active development.
