@@ -2,7 +2,7 @@
 
 AY-3-8912 Emulator is a replacement board for AY-3-8910, AY-3-8912, and YM2149F sound chips, designed for the DIP-28 form factor.
 
-![Photo](/hardware/v1.3/AY-3-8912-Emulator-v1.3_Photo.jpg)
+![Photo](/hardware/v1.3/AY-3-8912-Emulator-v1.3_Photo_V2.jpg)
 
 # Hardware
 
