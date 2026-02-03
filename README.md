@@ -4,6 +4,18 @@ AY-3-8912 Emulator is a replacement board for AY-3-8910, AY-3-8912, and YM2149F 
 
 ![Photo](/hardware/v1.3/AY-3-8912-Emulator-v1.3_Photo_V2.jpg)
 
+# Programmable Sound Generator
+
+AY-3-8910 is a programmable sound generator (PSG) developed by General Instrument in the late 1970s. It became one of the most widely used sound chips of the 8-bit era, appearing in many home computers and arcade systems. The chip provides three independent tone channels with programmable frequency and amplitude, as well as a noise generator that can be mixed into each channel. Sound generation is controlled through internal registers, making the AY-3-8910 easy to interface with microprocessors of its time. Its distinctive sound strongly influenced the chiptune audio style of early computer and video game systems.
+
+YM2149F is a fully compatible version of the AY-3-8910 manufactured by Yamaha. It follows the same internal architecture and programming model but features improved electrical characteristics and slightly different analog output behavior, especially at lower volume levels. Due to its stability and cleaner output, the YM2149F was widely used in European computer systems. From a software perspective, both chips are interchangeable and can be driven using identical register-level code.
+
+AY-3-8912 is a more compact and now relatively rare variant of the AY-3-8910. It preserves the full sound generation capabilities of the original chip but offers a reduced number of general-purpose I/O lines, targeting systems that did not require additional parallel ports. While less common, it remains fully compatible in terms of audio functionality. Together, these chips represent an important milestone in the development of digital sound hardware and remain relevant in retro computing and emulation projects.
+
+Internally, the AY-3-8910 and YM2149F use a register-based design with 16 programmable registers accessed over an 8-bit data bus. Sound generation is based on three independent square-wave tone generators with programmable frequency dividers and a shared pseudo-random noise generator with an adjustable period. A mixer register controls the contribution of tone and noise sources for each channel, while per-channel amplitude control allows either fixed volume levels or envelope-driven modulation.
+
+The envelope generator provides hardware-controlled amplitude changes using a programmable period and a set of predefined envelope shapes, reducing the need for continuous CPU updates. Output levels are produced by internal resistor-ladder DACs, which are inherently nonlinear; together with the analog output stages, this contributes to the characteristic sound of these chips. Although the YM2149F remains software-compatible with the AY-3-8910, minor hardware differences such as an optional internal clock divider and slightly different amplitude resolution can result in subtle but audible variations in sound.
+
 # Hardware
 
 TODO
